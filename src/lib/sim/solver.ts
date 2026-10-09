@@ -1,9 +1,12 @@
 /**
- * The WebGPU shallow-water solver as a module. It owns its buffers and
- * pipelines but draws nothing: a renderer reads `fields` (a texture) or
+ * The WebGPU shallow-water solver as a module. It runs on a device the caller
+ * owns (a map-kit overlay's, or one from gpu.ts), owns its buffers and
+ * pipelines, and draws nothing: a renderer reads `fields` (a texture) or
  * `buffers` directly. See FRAME.md for the grid frame and README.md for use.
  */
+import commonWgsl from './common.wgsl?raw';
 import stepWgsl from './step.wgsl?raw';
+import musclWgsl from './muscl.wgsl?raw';
 import fieldsWgsl from './fields.wgsl?raw';
 import {
 	COMP_BYTES,
@@ -15,7 +18,7 @@ import {
 	type SolverOptions
 } from './config';
 import { statsFromSums } from './cpu';
-import type { Swell } from './swell';
+import { thetaFromCompass, type Swell } from './swell';
 
 export type { SolverOptions } from './config';
 
@@ -34,6 +37,8 @@ export interface WaveStats {
 }
 
 export interface Solver {
+	/** the device the solver was created on (owned by the caller, never destroyed here) */
+	readonly device: GPUDevice;
 	readonly params: Params;
 	/** model time (s) */
 	readonly time: number;
@@ -42,11 +47,17 @@ export interface Solver {
 	 * (eta, h, foam, zb). Updated at the end of every step() call.
 	 */
 	readonly fields: GPUTexture;
+	/** rgba16float, width nx, height ny, texel (ix, iy) = (u, v, 0, 0) in m/s along +ix, +iy */
+	readonly flow: GPUTexture;
 	/** raw buffers: state (h, hu, hv, foam) as vec4<f32> and bed zb as f32, idx = ix * ny + iy */
 	readonly buffers: { state: GPUBuffer; bed: GPUBuffer };
 	/** advance by `substeps` steps of dt (default from options) */
 	step(substeps?: number): void;
 	setSwell(swell: Swell): void;
+	/** the current swell */
+	readonly swell: Swell;
+	/** unit travel direction of the swell in grid space (+ix, +iy) */
+	swellDirection(): [number, number];
 	/** replace the bathymetry and reset to still water */
 	setDepth(depth: Float32Array): void;
 	/** surface elevation (m) on wet cells, 0 on dry */
@@ -75,11 +86,18 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 	const bed = device.createBuffer({ size: N * 4, usage: S | GPUBufferUsage.COPY_DST });
 	const stateA = device.createBuffer({ size: N * 16, usage: S | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
 	const stateB = device.createBuffer({ size: N * 16, usage: S | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+	// RK stage U1 (MUSCL only)
+	const stateS = device.createBuffer({ size: p.scheme === 'muscl' ? N * 16 : 16, usage: S });
 	const comps = device.createBuffer({ size: MAX_COMPONENTS * COMP_BYTES, usage: S | GPUBufferUsage.COPY_DST });
 	const stats = device.createBuffer({ size: N * 16, usage: S | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
 	const params = device.createBuffer({ size: SLOT * MAX_BATCH, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 	const dims = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 	const fields = device.createTexture({
+		size: [nx, ny],
+		format: 'rgba16float',
+		usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
+	});
+	const flow = device.createTexture({
 		size: [nx, ny],
 		format: 'rgba16float',
 		usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
@@ -99,7 +117,8 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			{ binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 3, visibility: C, buffer: { type: 'storage' } },
-			{ binding: 4, visibility: C, buffer: { type: 'read-only-storage' } }
+			{ binding: 4, visibility: C, buffer: { type: 'read-only-storage' } },
+			{ binding: 5, visibility: C, buffer: { type: 'read-only-storage' } }
 		]
 	});
 	const fieldsLayout = device.createBindGroupLayout({
@@ -108,20 +127,25 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			{ binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 3, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } },
-			{ binding: 4, visibility: C, buffer: { type: 'storage' } }
+			{ binding: 4, visibility: C, buffer: { type: 'storage' } },
+			{ binding: 5, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } }
 		]
 	});
-	const stepModule = device.createShaderModule({ code: stepWgsl, label: 'step.wgsl' });
-	const fieldsModule = device.createShaderModule({ code: fieldsWgsl, label: 'fields.wgsl' });
-	const stepPipe = device.createComputePipeline({
-		layout: device.createPipelineLayout({ bindGroupLayouts: [stepLayout] }),
-		compute: { module: stepModule, entryPoint: 'step' }
+	const stepModule = device.createShaderModule({
+		code: commonWgsl + (p.scheme === 'muscl' ? musclWgsl : stepWgsl),
+		label: p.scheme === 'muscl' ? 'muscl.wgsl' : 'step.wgsl'
 	});
+	const fieldsModule = device.createShaderModule({ code: fieldsWgsl, label: 'fields.wgsl' });
+	const stepPL = device.createPipelineLayout({ bindGroupLayouts: [stepLayout] });
+	const entries = p.scheme === 'muscl' ? ['stage1', 'stage2'] : ['step'];
+	const stepPipes = entries.map((entryPoint) =>
+		device.createComputePipeline({ layout: stepPL, compute: { module: stepModule, entryPoint } })
+	);
 	const fieldsPL = device.createPipelineLayout({ bindGroupLayouts: [fieldsLayout] });
 	const packPipe = device.createComputePipeline({ layout: fieldsPL, compute: { module: fieldsModule, entryPoint: 'pack' } });
 	const accPipe = device.createComputePipeline({ layout: fieldsPL, compute: { module: fieldsModule, entryPoint: 'accumulate' } });
 
-	const stepBG = (src: GPUBuffer, dst: GPUBuffer) =>
+	const stepBG = (src: GPUBuffer, dst: GPUBuffer, stg: GPUBuffer) =>
 		device.createBindGroup({
 			layout: stepLayout,
 			entries: [
@@ -129,7 +153,8 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 				{ binding: 1, resource: { buffer: bed } },
 				{ binding: 2, resource: { buffer: src } },
 				{ binding: 3, resource: { buffer: dst } },
-				{ binding: 4, resource: { buffer: comps } }
+				{ binding: 4, resource: { buffer: comps } },
+				{ binding: 5, resource: { buffer: stg } }
 			]
 		});
 	const fieldsBG = (src: GPUBuffer) =>
@@ -140,11 +165,19 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 				{ binding: 1, resource: { buffer: bed } },
 				{ binding: 2, resource: { buffer: src } },
 				{ binding: 3, resource: fields.createView() },
-				{ binding: 4, resource: { buffer: stats } }
+				{ binding: 4, resource: { buffer: stats } },
+				{ binding: 5, resource: flow.createView() }
 			]
 		});
-	const bgAB = stepBG(stateA, stateB);
-	const bgBA = stepBG(stateB, stateA);
+	// bind groups per pass, for the current state in A and in B
+	const passesFromA =
+		p.scheme === 'muscl'
+			? [stepBG(stateA, stateS, stateA), stepBG(stateA, stateB, stateS)]
+			: [stepBG(stateA, stateB, stateA)];
+	const passesFromB =
+		p.scheme === 'muscl'
+			? [stepBG(stateB, stateS, stateB), stepBG(stateB, stateA, stateS)]
+			: [stepBG(stateB, stateA, stateB)];
 	const fA = fieldsBG(stateA);
 	const fB = fieldsBG(stateB);
 	let curIsA = true;
@@ -195,9 +228,12 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			const enc = device.createCommandEncoder();
 			const pass = enc.beginComputePass();
 			for (let i = 0; i < k; i++) {
-				pass.setPipeline(stepPipe);
-				pass.setBindGroup(0, curIsA ? bgAB : bgBA, [i * SLOT]);
-				pass.dispatchWorkgroups(WX, WY);
+				const groups = curIsA ? passesFromA : passesFromB;
+				for (let pi = 0; pi < stepPipes.length; pi++) {
+					pass.setPipeline(stepPipes[pi]);
+					pass.setBindGroup(0, groups[pi], [i * SLOT]);
+					pass.dispatchWorkgroups(WX, WY);
+				}
 				curIsA = !curIsA;
 				if (statsOn) {
 					pass.setPipeline(accPipe);
@@ -232,11 +268,13 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 	setDepth(opts.depth);
 
 	return {
+		device,
 		params: p,
 		get time() {
 			return t;
 		},
 		fields,
+		flow,
 		get buffers() {
 			return { state: curIsA ? stateA : stateB, bed };
 		},
@@ -244,6 +282,13 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		setSwell(swell: Swell) {
 			options = { ...options, swell };
 			uploadComponents();
+		},
+		get swell() {
+			return options.swell;
+		},
+		swellDirection() {
+			const th = thetaFromCompass(options.swell.dirDeg, p.rotationDeg);
+			return [Math.cos(th), Math.sin(th)] as [number, number];
 		},
 		setDepth,
 		readState,
@@ -273,8 +318,9 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			return statsFromSums(sums, N, samples);
 		},
 		dispose() {
-			for (const b of [bed, stateA, stateB, comps, stats, params, dims]) b.destroy();
+			for (const b of [bed, stateA, stateB, stateS, comps, stats, params, dims]) b.destroy();
 			fields.destroy();
+			flow.destroy();
 		}
 	};
 }

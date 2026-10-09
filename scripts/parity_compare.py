@@ -22,9 +22,16 @@ S = json.load(open(sim_path))
 R = np.load(ref_path)
 geo = json.load(open("src/lib/spots/jbay.json"))
 shape = (NX, NY)
-sHs = np.array(S["Hs"], np.float32).reshape(shape)
-sFm = np.array(S["foamMean"], np.float32).reshape(shape)
-sFf = np.array(S["foamFrac"], np.float32).reshape(shape)
+snx, sny = S.get("nx", NX), S.get("ny", NY)
+
+
+def field(name):
+    a = np.array(S[name], np.float32).reshape(snx, sny)
+    bx, by = snx // NX, sny // NY  # finer runs are block-averaged to the 12.5 m grid
+    return a.reshape(NX, bx, NY, by).mean(axis=(1, 3)) if bx > 1 else a
+
+
+sHs, sFm, sFf = field("Hs"), field("foamMean"), field("foamFrac")
 rHs, rFm, rFf, depth = R["Hs"], R["foamMean"], R["foamFrac"], R["depth"]
 
 XX, YY = np.meshgrid(x, y, indexing="ij")
@@ -40,7 +47,13 @@ def stats(a, b, m):
                 bias=float(d.mean()), rms=float(np.sqrt((d * d).mean())), r=float(r))
 
 
-print(f"## {S.get('engine')} run: spin-up {S['spinup']} s, record {S['record']} s, dt {S['dt']} s, {S['samples']} samples\n")
+SUMMARY = "--summary" in sys.argv
+if SUMMARY:
+    import io, contextlib
+    _buf = io.StringIO()
+    _ctx = contextlib.redirect_stdout(_buf)
+    _ctx.__enter__()
+print(f"## {S.get('engine')} {S.get('scheme', 'first-order')} at {S.get('dx', 12.5)} m: spin-up {S['spinup']} s, record {S['record']} s, dt {S['dt']} s, {S['samples']} samples\n")
 print("### Hs field (m), interior wet cells\n")
 print("| depth band | cells | Run A mean Hs | sim mean Hs | sim / Run A | RMS diff | r |")
 print("|---|---|---|---|---|---|---|")
@@ -110,13 +123,23 @@ for dy in range(-800, 801, 100):
 ra, sa = np.array(ra), np.array(sa)
 print(f"\nmean along the isobath: Run A {ra.mean():.2f} m, sim {sa.mean():.3f} m (ratio {sa.mean()/ra.mean():.3f}); r = {np.corrcoef(ra, sa)[0,1]:.2f}")
 
+if SUMMARY:
+    _ctx.__exit__(None, None, None)
+    a = stats(sHs, rHs, mask)
+    m3 = mask & (depth <= 3)
+    nb = sum(1 for v in brk.values() if v[1] is not None)
+    print(f"{sim_path}: Hs ratio {a['sim']/a['runA']:.2f} r {a['r']:.2f} | Hs<3m ratio {sHs[m3].mean()/rHs[m3].mean():.2f} | "
+          f"foam cells {(sFm[mask] > F).mean()*100:.2f}% (A 1.18) | foam time d<5 {sFf[m5].mean()*100:.1f}% (A 7.4) "
+          f"d<1.5 {sFf[m1].mean()*100:.1f}% (A 28.6) | break lines {nb}/8 | isobath r {np.corrcoef(ra, sa)[0,1]:.2f}")
+    sys.exit(0)
+
 if plots:
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     ext = [y[0] - DX / 2, y[-1] + DX / 2, x[-1] + DX / 2, x[0] - DX / 2]
     fig, axes = plt.subplots(3, 1, figsize=(10, 8.4))
     for ax, a, title in [(axes[0], rHs, "Run A (MUSCL + RK2, 2.5 m) Hs, block-averaged to 12.5 m"),
-                         (axes[1], sHs, f"surf-lab {S.get('engine')} (first-order, 12.5 m) Hs")]:
+                         (axes[1], sHs, f"surf-lab {S.get('engine')} ({S.get('scheme', 'first-order')}, {S.get('dx', 12.5)} m) Hs")]:
         im = ax.imshow(np.where(depth > 0.3, a, np.nan), extent=ext, cmap="magma", vmin=0, vmax=2.8, aspect="equal")
         ax.contour(y, x, rFm, levels=[F], colors=["cyan"], linewidths=0.7)
         ax.set_title(title, fontsize=9); ax.set_ylabel("x east (m)")
@@ -127,8 +150,9 @@ if plots:
     offs = x - sup["x"]
     m = depth[:, sup_iy] > 0.3
     axes[2].plot(offs[m], rHs[m, sup_iy], label="Run A")
-    axes[2].plot(offs[m], sHs[m, sup_iy], label="surf-lab first-order")
+    axes[2].plot(offs[m], sHs[m, sup_iy], label=f"surf-lab {S.get('scheme', 'first-order')} {S.get('dx', 12.5)} m")
     axes[2].set_xlabel("distance seaward of the coast at Supertubes (m)"); axes[2].set_ylabel("Hs (m)")
     axes[2].legend(fontsize=8); axes[2].set_title("cross-shore Hs at Supertubes (cyan contour above: Run A mean foam 0.15)", fontsize=9)
-    fig.tight_layout(); fig.savefig(f"{plots}/parity-hs.png", dpi=80)
-    print(f"\nwrote {plots}/parity-hs.png")
+    fig.tight_layout(); name = f"parity-hs-{S.get('scheme', 'first-order')}-{S.get('dx', 12.5)}.png"
+    fig.savefig(f"{plots}/{name}", dpi=80)
+    print(f"\nwrote {plots}/{name}")

@@ -5,7 +5,7 @@
 	import { createSolver } from '#lib/sim/solver.ts';
 	import { createCpuSolver } from '#lib/sim/cpu.ts';
 	import { requestDevice } from '#lib/sim/gpu.ts';
-	import { JBAY, JBAY_GRID, JBAY_RUN_A_SWELL } from '#lib/spots/jbay.ts';
+	import { JBAY, JBAY_RUN_A_SWELL, jbayGrid } from '#lib/spots/jbay.ts';
 
 	let log = $state<string[]>([]);
 	const say = (s: string) => (log = [...log, s]);
@@ -20,12 +20,24 @@
 			say(`adapter: ${info.vendor} ${info.architecture} ${info.device} ${info.description}`);
 			const errors: string[] = [];
 			device.addEventListener('uncapturederror', (e) => errors.push((e as GPUUncapturedErrorEvent).error.message));
-			const { depth } = bathyFromPolyline(JBAY.coast, JBAY_GRID, undefined, {}, { supersample: 5 });
-			const opts = { nx: JBAY_GRID.nx, ny: JBAY_GRID.ny, dx: JBAY_GRID.dx, depth, swell: JBAY_RUN_A_SWELL };
+			const dx = Number(q.get('dx') ?? 12.5);
+			const scheme = (q.get('scheme') ?? 'muscl') as 'muscl' | 'first-order';
+			const grid = jbayGrid(dx);
+			const { depth } = bathyFromPolyline(JBAY.coast, grid, undefined, {}, { supersample: Math.max(1, Math.round(dx / 2.5)) });
+			const breaking = q.get('breaking') ? JSON.parse(q.get('breaking')!) : undefined;
+			const opts = {
+				nx: grid.nx, ny: grid.ny, dx, depth, swell: JBAY_RUN_A_SWELL, scheme, breaking,
+				dt: q.get('dt') ? Number(q.get('dt')) : undefined,
+				// same widths in metres as Run C at 12.5 m
+				wavemaker: { width: 75 / dx },
+				sponge: { width: 150 / dx }
+			};
+			
 
 			// 1. GPU vs CPU twin from rest
-			const twinSteps = Number(q.get('twin') ?? 300);
+			const twinSteps = Number(q.get('twin') ?? (dx < 12.5 ? 0 : 100));
 			const gpu = createSolver(device, opts);
+			say(`scheme ${scheme}, ${grid.nx} x ${grid.ny} at ${dx} m, dt ${gpu.params.dt.toFixed(3)} s, Froude ${gpu.params.froudeT.toFixed(2)}`);
 			const cpu = createCpuSolver(opts);
 			gpu.step(twinSteps);
 			cpu.step(twinSteps);
@@ -53,6 +65,11 @@
 			say(`spin-up ${spinup} s in ${tSpin.toFixed(0)} ms; total ${(spinup + record).toFixed(0)} s model in ${tAll.toFixed(0)} ms; ${stats.samples} samples`);
 			say(`errors: ${errors.length ? errors.join('; ') : 'none'}`);
 			(window as unknown as { __parity: unknown }).__parity = {
+				scheme,
+				dx,
+				nx: grid.nx,
+				ny: grid.ny,
+				breaking: gpu.params,
 				adapter: `${info.vendor} ${info.architecture} ${info.description}`,
 				twin: { steps: twinSteps, maxDh, maxDq },
 				spinup,

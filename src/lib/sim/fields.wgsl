@@ -8,8 +8,10 @@ struct Dims { nx: u32, ny: u32, foamT: f32, pad0: f32 };
 @group(0) @binding(2) var<storage, read> state: array<vec4<f32>>;
 @group(0) @binding(3) var fields: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(4) var<storage, read_write> stats: array<vec4<f32>>;
+@group(0) @binding(5) var flow: texture_storage_2d<rgba16float, write>;
 
-// texel (ix, iy) = (eta, h, foam, zb); eta = h + zb is the free surface
+// fields texel (ix, iy) = (eta, h, foam, zb); eta = h + zb is the free surface
+// flow texel (ix, iy) = (u, v, 0, 0), depth-averaged velocity (m/s) along +ix, +iy
 @compute @workgroup_size(16, 16)
 fn pack(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= D.nx || gid.y >= D.ny) { return; }
@@ -17,6 +19,9 @@ fn pack(@builtin(global_invocation_id) gid: vec3<u32>) {
   let s = state[i];
   let zb = bed[i];
   textureStore(fields, vec2<u32>(gid.x, gid.y), vec4<f32>(s.x + zb, s.x, s.w, zb));
+  var u = vec2<f32>(0.0);
+  if (s.x > 0.05) { u = s.yz / s.x; }
+  textureStore(flow, vec2<u32>(gid.x, gid.y), vec4<f32>(u, 0.0, 0.0));
 }
 
 // stats[i] += (eta, eta^2, foam, foam > foamT) over wet cells

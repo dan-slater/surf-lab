@@ -3,12 +3,13 @@
 	import { createSolver, type Solver } from '#lib/sim/solver.ts';
 	import { createDebugRenderer } from '#lib/sim/debug-render.ts';
 	import { requestDevice } from '#lib/sim/gpu.ts';
-	import { JBAY, JBAY_GRID, JBAY_RUN_A_SWELL } from '#lib/spots/jbay.ts';
+	import { JBAY, JBAY_RUN_A_SWELL, jbayGrid } from '#lib/spots/jbay.ts';
 
 	let canvas: HTMLCanvasElement;
 	let status = $state('starting');
 	let modelTime = $state(0);
 	let fps = $state(0);
+	let label = $state('');
 
 	$effect(() => {
 		let raf = 0;
@@ -23,17 +24,41 @@
 				Tp: Number(q.get('tp') ?? JBAY_RUN_A_SWELL.Tp),
 				dirDeg: Number(q.get('dir') ?? JBAY_RUN_A_SWELL.dirDeg)
 			};
-			const { depth } = bathyFromPolyline(JBAY.coast, JBAY_GRID);
-			solver = createSolver(device, { nx: JBAY_GRID.nx, ny: JBAY_GRID.ny, dx: JBAY_GRID.dx, depth, swell });
+			const grid = jbayGrid(Number(q.get('dx') ?? 6.25));
+			const scheme = (q.get('scheme') ?? 'muscl') as 'muscl' | 'first-order';
+			const { depth } = bathyFromPolyline(JBAY.coast, grid);
+			solver = createSolver(device, {
+				nx: grid.nx, ny: grid.ny, dx: grid.dx, depth, swell, scheme,
+				wavemaker: { width: 75 / grid.dx },
+				sponge: { width: 150 / grid.dx }
+			});
+			label = `${scheme}, ${grid.nx} x ${grid.ny} at ${grid.dx} m, dt ${solver.params.dt.toFixed(3)} s`;
 			const warm = Number(q.get('warm') ?? 0);
 			if (warm > 0) solver.step(Math.round(warm / solver.params.dt));
-			const r = createDebugRenderer(device, canvas, solver);
+			// model seconds per real second
+			const speed = Number(q.get('speed') ?? 10);
+			let owed = 0;
+			let prev = performance.now();
+			let target: HTMLCanvasElement | { context: GPUCanvasContext; format: GPUTextureFormat } = canvas;
+			if (q.get('external')) {
+				// what map-kit's <Overlay mode="webgpu"> hands over in frame.gpu
+				const context = canvas.getContext('webgpu') as GPUCanvasContext;
+				const format = navigator.gpu.getPreferredCanvasFormat();
+				context.configure({ device, format, alphaMode: 'premultiplied' });
+				target = { context, format };
+			}
+			const r = createDebugRenderer(solver, target);
 			status = 'running';
 			let frames = 0;
 			let last = performance.now();
 			const frame = () => {
 				if (!alive || !solver) return;
-				solver.step();
+				const now0 = performance.now();
+				owed += (Math.min(now0 - prev, 100) / 1000) * speed;
+				prev = now0;
+				const n = Math.floor(owed / solver.params.dt);
+				owed -= n * solver.params.dt;
+				if (n > 0) solver.step(n);
 				r.draw();
 				modelTime = solver.time;
 				frames++;
@@ -56,8 +81,8 @@
 </script>
 
 <p>
-	J-Bay, {JBAY_GRID.nx} x {JBAY_GRID.ny} at {JBAY_GRID.dx} m. Along-shore left to right (south to north),
-	land at the top, wavemaker at the bottom. {status}. t = {modelTime.toFixed(1)} s, {fps.toFixed(0)} fps.
-	Query: ?hs=2.5&amp;tp=15&amp;dir=120&amp;warm=300
+	J-Bay, {label}. Along-shore left to right (south to north), land at the top, wavemaker at the bottom.
+	{status}. t = {modelTime.toFixed(1)} s, {fps.toFixed(0)} fps.
+	Query: ?hs=2.5&amp;tp=15&amp;dir=120&amp;warm=300&amp;speed=10&amp;dx=6.25&amp;scheme=muscl
 </p>
-<canvas bind:this={canvas} width={JBAY_GRID.ny * 2} height={JBAY_GRID.nx * 2} style="width: 100%; max-width: 1536px"></canvas>
+<canvas bind:this={canvas} width={1024} height={384} style="width: 100%; max-width: 1536px"></canvas>
