@@ -25,5 +25,9 @@
   },
   "imports": {
     "#lib/*": "./src/lib/*"
+  },
+  "dependencies": {
+    "@dan-slater/map-kit": "github:dan-slater/map-kit#v0.1.0",
+    "maplibre-gl": "^5"
   }
 }
