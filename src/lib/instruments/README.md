@@ -12,10 +12,8 @@ them on one page: `/book/instruments`.
 
 **Direction.** `dirDeg` is always the deep-water compass direction (J-Bay
 225°), as the app store will carry it. Only `Sim2D` needs the wavemaker's local
-direction; it converts with `generatorDirectionFor` in `direction.ts`, a
-J-Bay-only stand-in (Run A's 225° → 120°) with the same signature as the sim
-line's coming `generatorDirection(deepWaterDeg, grid, depth)`. Swapping it in
-is a one-line change in that file.
+direction; it converts with the sim line's `generatorDirection(deepWaterDeg,
+grid, depthAtWavemaker, { Tp })` (225° → 129° at 15 s on J-Bay).
 
 **Reflow.** From 600 CSS px up an instrument draws at its design size (880 wide)
 scaled to fit. Below 600 the logical width is the real CSS width, so 10 px
@@ -57,7 +55,7 @@ than inventing a value.
 | `SwellArrival.svelte` | swell | t = 4πX / gT; T<sub>group</sub> = T / (Δf/f) |
 | `SwellPower.svelte` | swell | P = ρg²H<sub>s</sub>²T<sub>p</sub> / 64π; wave base gT² / 4π |
 | `Iribarren.svelte` | breaking | ξ₀ = tan α / √(H₀/L₀) |
-| `Sim2D.svelte` | breaking | the WebGPU solver in `src/lib/sim` on J-Bay; a captured frame without WebGPU |
+| `Sim2D.svelte` | breaking | the WebGPU solver in `src/lib/sim` on J-Bay (MUSCL + RK2, 6.25 m); a captured frame without WebGPU |
 | `CatchGap.svelte` | catching | c<sub>b</sub> = √(2gH<sub>b</sub>); d = (c − u₀)² / 2g sin θ |
 | `Refraction.svelte` | day | sin a / sin a₀ = c / c₀; K<sub>R</sub>; H = H₀K<sub>R</sub>K<sub>S</sub> |
 | `Tide.svelte` | day | h<sub>b</sub> = 1.28H<sub>b</sub> on a 1:50 / 1:15 profile, sinusoidal tide, ξ₀ at the break |
@@ -86,7 +84,6 @@ against the chapters' worked examples.
 - `stage.ts`, `use-stage.svelte.ts`: the design size, or the narrow layout
   under 600 px (`{ W, H, narrowH(w) }`), backed at devicePixelRatio, redrawn on
   resize, DPR change and any reactive input; animation loops pause off screen.
-- `direction.ts`: deep-water to wavemaker direction (stand-in, see above).
 - `palette.ts`: colours and the mono face from CSS custom properties
   (`--ink`, `--teal`, `--coral`, ...; see `src/routes/book/tokens.css`).
 - `Frame.svelte`, `Slider.svelte`, `plot.ts`: the card, a labelled range, and

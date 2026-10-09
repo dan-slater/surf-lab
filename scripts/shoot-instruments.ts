@@ -8,7 +8,18 @@
  * Uses the sim line's scripts/browser.ts (headless Chrome with WebGPU).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { launch, warmGpu } from './browser';
+import { launch } from './browser';
+
+/** Wake the GPU process on a page that stays put (the site root now navigates client-side). */
+async function warm(page: import('playwright-core').Page, base: string) {
+	await page.goto(`${base}/book`);
+	await page.evaluate(async () => {
+		for (let i = 0; i < 10; i++) {
+			if (await navigator.gpu?.requestAdapter()) return;
+			await new Promise((r) => setTimeout(r, 300));
+		}
+	});
+}
 
 const base = process.argv[2] ?? 'http://127.0.0.1:5183';
 const out = 'docs/img/instruments';
@@ -39,7 +50,7 @@ page.on('console', (m) => {
 page.on('pageerror', (e) => problems.push(`[pageerror] ${e.message}`));
 
 await page.setViewportSize({ width: 1100, height: 1400 });
-await warmGpu(page, base);
+await warm(page, base);
 await page.goto(`${base}/book/instruments`);
 const ids = await page.$$eval('[data-instrument]', (els) => els.map((e) => (e as HTMLElement).dataset.instrument!));
 for (const id of ids) {
