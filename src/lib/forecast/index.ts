@@ -21,11 +21,12 @@ const memory = new Map<string, DaySeries>();
 const inflight = new Map<string, Promise<DaySeries | null>>();
 const key = (p: ForecastPoint) => `surflab:forecast:${p.slug}@${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
 
-let fetcher: typeof fetch = (...a) => fetch(...a);
+type Fetcher = (url: string) => Promise<Response>;
+let fetcher: Fetcher = (url) => fetch(url);
 let clock = () => Date.now();
 
 /** For tests: swap the network and the clock. */
-export function _setTransport(f: typeof fetch, now: () => number = () => Date.now()) {
+export function _setTransport(f: Fetcher, now: () => number = () => Date.now()) {
 	fetcher = f;
 	clock = now;
 	memory.clear();

@@ -1,0 +1,138 @@
+/*
+ * surf-lab palette and type: ink navy, teal, coral; Fraunces for display,
+ * Instrument Sans for text, Spline Sans Mono for numbers. The same tokens
+ * theme map-kit (--mk-*).
+ */
+:root {
+	--ink: #071019;
+	--ink-2: #0a1a26;
+	--panel: rgba(9, 22, 33, 0.82);
+	--panel-solid: #0c1e2c;
+	--line: rgba(122, 197, 200, 0.16);
+	--line-strong: rgba(122, 197, 200, 0.4);
+	--text: #e9f0ec;
+	--muted: #8fa8ad;
+	--teal: #7ac5c8;
+	--teal-hi: #b5e5e2;
+	--foam: #f2efe6;
+	--accent: #ff8a5c;
+	--accent-deep: #e06a3e;
+	--gold: #ffb454;
+
+	--serif: 'Fraunces', Georgia, serif;
+	--sans: 'Instrument Sans', system-ui, sans-serif;
+	--mono: 'Spline Sans Mono', ui-monospace, monospace;
+
+	--radius: 10px;
+	--gap: clamp(0.75rem, 2.5vw, 1.25rem);
+
+	--mk-color-accent: var(--teal);
+	--mk-color-pin: var(--teal);
+	--mk-color-pin-selected: var(--accent);
+	--mk-color-surface: var(--panel-solid);
+	--mk-color-text: var(--text);
+	--mk-color-surface-muted: var(--ink-2);
+	--mk-color-text-muted: var(--muted);
+	--mk-color-border: var(--line-strong);
+	--mk-color-pin-stroke: var(--ink);
+	--mk-color-focus: var(--accent);
+	--mk-panel-background: var(--panel);
+	--mk-font-family: var(--sans);
+	--mk-font-family-mono: var(--mono);
+	--mk-radius-lg: var(--radius);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--ink);
+	color: var(--text);
+	font-family: var(--sans);
+	font-size: 16px;
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+}
+
+::selection {
+	background: var(--accent);
+	color: var(--ink);
+}
+
+a {
+	color: var(--teal);
+}
+a:hover {
+	color: var(--teal-hi);
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--serif);
+	font-weight: 500;
+	line-height: 1.15;
+	margin: 0 0 0.5em;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+}
+
+.num {
+	font-family: var(--mono);
+	font-variant-numeric: tabular-nums;
+}
+
+.honesty {
+	font-family: var(--mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.03em;
+	color: var(--muted);
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45em;
+	padding: 0.5em 0.9em;
+	border-radius: 999px;
+	border: 1px solid var(--line-strong);
+	background: rgba(7, 16, 25, 0.6);
+	color: var(--text);
+	font-size: 0.9rem;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background 0.15s,
+		border-color 0.15s;
+}
+.btn:hover {
+	border-color: var(--teal);
+	background: rgba(122, 197, 200, 0.12);
+	color: var(--text);
+}
+.btn.primary {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: progress;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

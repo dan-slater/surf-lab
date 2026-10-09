@@ -69,10 +69,10 @@ describe('pickHour', () => {
 describe('todayForAll', () => {
 	test('batches uncached spots into one request and caches the day', async () => {
 		const urls: string[] = [];
-		_setTransport((async (u: string) => {
+		_setTransport(async (u: string) => {
 			urls.push(u);
 			return new Response(JSON.stringify(two));
-		}) as unknown as typeof fetch, () => AT);
+		}, () => AT);
 		const [a, b] = await todayForAll([jbay, pipe]);
 		expect(urls).toHaveLength(1);
 		expect(a?.Hs).toBe(1.44);
@@ -83,11 +83,11 @@ describe('todayForAll', () => {
 	});
 	test('concurrent callers share one request', async () => {
 		let n = 0;
-		_setTransport((async () => {
+		_setTransport(async () => {
 			n++;
 			await new Promise((r) => setTimeout(r, 5));
 			return new Response(JSON.stringify(one));
-		}) as unknown as typeof fetch, () => AT);
+		}, () => AT);
 		const m = { slug: 'mundaka', lat: 43.4073, lon: -2.6963 };
 		const [x, y] = await Promise.all([todayFor(m), todayFor(m)]);
 		expect(n).toBe(1);
@@ -95,7 +95,7 @@ describe('todayForAll', () => {
 		expect(x?.Hs).toBe(1.5);
 	});
 	test('a failed request gives null, not a throw', async () => {
-		_setTransport((async () => new Response('nope', { status: 503 })) as unknown as typeof fetch, () => AT);
+		_setTransport(async () => new Response('nope', { status: 503 }), () => AT);
 		expect(await todayFor(jbay)).toBeNull();
 	});
 });
