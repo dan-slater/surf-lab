@@ -1,5 +1,130 @@
 # surf-lab — HANDOVER
 
+
+> ## 🚀 CONTROL-PLANE HANDOVER (2026-10-09 ~08:45 UTC) — merged, integrated, LIVE noindexed at surf.danielslater.dev — READ THIS FIRST
+>
+> **State:** `main` 227a04d on GitHub, the Mac and `zulzi:~/code/surf-lab`. Branches `app` and `book`
+> are merged (the HANDOVER.md conflicts were the only ones; `bun.lock` regenerated). The branch
+> worktrees `~/code/surf-lab-app` (12d4cc5) and `~/code/surf-lab-book` (a6781ec) on zulzi are now
+> behind main and can be removed with their lines. `bun run check` 0 errors, `bun test` 70 pass,
+> `bun run build` prerenders `/`, `/map`, 20 `/spot/*`, `/book` + 9 chapters.
+>
+> **Done this session:**
+> 1. **App on the product renderer** (f292c08): `src/lib/ui/sim-engine.ts` drops the debug painter
+>    and its own set envelope and spin-up. It uses `createRenderer`, `Swell.groupiness` 0.5,
+>    `rampFrom(0)`, `solver.budget(12)`, the front tracker, and the surfer crowd on a 2d canvas in
+>    `SimView` (only where a scene has placed sections). The renderer gained `overlay: true` for
+>    map-kit's premultiplied canvas: land transparent, sea faded past the grid edge, so the globe
+>    keeps its basemap. Proven on the 4090: cover, `/spot/jeffreys-bay`, and a Durban map click.
+> 2. **Book**: it already used the real `generatorDirection` (the stand-in was gone on `book`). It
+>    now seeds its swell from the app store when the visitor's spot is J-Bay; chapter presets win,
+>    sliders stay local.
+> 3. **Catalogue coordinates** (fe4b172): Skeleton Bay, Lance's Right and Teahupo'o moved onto the
+>    breaks from published figures; Pasta Point and Punta de Lobos kept. Every spot now sits within
+>    600 m of the coast. Details and two open-sea-bearing mismatches in `src/lib/spots/FRAME-CHOICE.md`.
+> 4. **Deploy**: CF Pages project `surf-lab` (direct upload, personal account, prod branch `main`),
+>    custom domain `surf.danielslater.dev` + proxied CNAME. `static/_worker.js` 404s every other host
+>    (pages.dev verified 404) and sets `x-robots-tag: noindex, nofollow` until `INDEX = true`.
+>    All routes 200 live.
+>
+> **Open / next:**
+> 1. **Redeploy needed for the 404 fix** (227a04d adds `fallback: '404.html'` + absolute paths;
+>    the live build still answers `/nope` with 200). The auto-mode classifier denied the second
+>    `wrangler pages deploy`; run it in manual permission mode:
+>    `SURF_BOOK_DIR=~/dan-hub/surf-physics-book/chapters bun run build` then
+>    `CLOUDFLARE_EMAIL=… CLOUDFLARE_API_KEY=… CLOUDFLARE_ACCOUNT_ID=084af6c166c202c97486fc413d55ed36 bunx wrangler@4 pages deploy build --project-name surf-lab --branch main`.
+>    ⚠️ Never run `wrangler pages project create` with wrangler 4.149+: it delegates to a Workers
+>    autoconfig that rewrote six project files (reverted). Create projects through the API.
+> 2. **map-kit v0.1.1**: `ORCH-mapkit` hit the account usage limit at 08:13 mid-edit (uncommitted
+>    `coastline.ts`, `index.ts`, `tests/coastline.test.ts`, `scripts/probe-winding.mjs` in
+>    `zulzi:~/code/map-kit`) and resumes on its own at 10:10 UTC. Collect its work, tag v0.1.1,
+>    bump surf-lab's pin, rebuild, redeploy. The live globe still uses the light basemap until then.
+> 3. **Real-browser fps** on a laptop GPU (Daniel): `https://surf.danielslater.dev/` and
+>    `/sim/cover?warm=400&across=2000&cx=-20&cy=-150&speed=4&groupiness=0.5`; `?dx=12.5` is the fallback.
+>    The coarser-grid budget level is exposed as `engine.level` but nothing rebuilds the scene yet.
+> 4. **Daniel decides**: the hostname (kept as proposed), flipping `INDEX`, cover framing/speed, the
+>    renderer's look, the foam band width.
+> 5. Kill `ORCH-sim`, `ORCH-app`, `ORCH-book` (idle, work merged) and their dev tmux sessions once
+>    Daniel no longer wants the dev ports; never kill-all (peer `ORCH-fv-*`).
+>
+> **Known noise:** Chrome logs "READ-usage buffer was written … before being read back" from the
+> front tracker's readback every frame; harmless, worth a ring of staging buffers later. Teahupo'o's
+> coast capture includes inland river slivers the sim treats as sea.
+
+> ## 🏭 CONTROL-PLANE HANDOVER (2026-10-09 morning, SUPERSEDED by the block above) — four factory lines on zulzi, steps 1–5 built, nothing merged or deployed — READ THIS FIRST
+>
+> **Goal:** ship surf-lab (cover + dial + globe + click-any-coast + book + catalogue) on a public URL with
+> map-kit consumed by tag. Built on 2026-10-08/09 by four fenced `claude` lines on zulzi-gpu driven from
+> the Mac with the tmux-orchestrator skill (`factory.sh`). The line-written blocks below this one are each
+> line's own state (SIM LINE on main; APP LINE on branch `app`; BOOK LINE on branch `book`).
+>
+> **⚠️ UNCOMMITTED WIP:** none anywhere (all four checkouts on zulzi are clean). **UNMERGED WIP:** branches
+> `app` (8 commits, 12d4cc5) and `book` (8 commits, a6781ec) are on GitHub but NOT merged into `main`
+> (7087cf6). A trial `git merge app` on the Mac conflicts only in `HANDOVER.md` (each line wrote its own
+> top block; keep all three blocks). Do the merge on the Mac, then `git pull` in the zulzi checkouts.
+>
+> **What shipped (all on GitHub):**
+> - map-kit `main` 33c8126, tag **v0.1.0** (at 2809264): Map/Pins/Panel/Layer/Overlay, `enuFrame`,
+>   `coastlineNear` (J-Bay: one 4.3 km, 133-vertex polyline), 71 tests, real-4090 WebGPU overlay run,
+>   basemap theming with presets ink/paper/chart/mono (`docs/img/themes/`). **Daniel picked INK.**
+> - surf-lab `main` 7087cf6: SvelteKit 3 static scaffold; `src/lib/sim/` = bathy-from-polyline
+>   (bit-exact vs Run A `depth.f32`), WGSL solver with **MUSCL-MC + SSP-RK2 default** (first-order kept as
+>   option), CPU twin, `gridFromCoast`, `generatorDirection` (225° deep water → 129° at the J-Bay
+>   generator), product renderer (lit depth-tinted sea, line-art foam), front tracking, P6 surfers,
+>   sets/lulls + `rampFrom(0)`, `solver.budget(ms)`; `/sim`, `/sim/cover`, `/sim/parity` dev routes.
+>   Parity: MUSCL 6.25 m = 91 % of Run A's Hs, 8/8 sections break (`src/lib/sim/PARITY.md`).
+> - surf-lab `app`: `/` cover+dial, `/map` globe with click-any-coast→sim (proven headless at Durban),
+>   `/spot/[slug]`, 20-spot catalogue, Open-Meteo forecast + cache, runes store, SimView wrapper.
+> - surf-lab `book`: `/book` + 9 chapters prerendered with build-time KaTeX, P1–P6 lifted + 15 derived
+>   instruments, scroll-swap, phone reflow to 360 px, `scripts/sync-content.mjs` (predev/prebuild).
+> - Both repos MIT (Daniel 2026-10-09). Book chapters staged at `zulzi:~/surf-physics-book/chapters/`
+>   (copy; the Mac repo `~/dan-hub/surf-physics-book` is still the only git copy, no remote).
+>
+> **Lines on zulzi right now** (`factory.sh state zulzi-gpu`): `ORCH-mapkit` ACTIVE on a queued
+> series: (a) fix the winding doc (app line found water on the RIGHT of `coastlineNear` polylines, docs
+> say left) + make the v0.1.0 git-tag install work under Kit 3/Vite 8 (prepare fails: Kit 2 config), then
+> (b) ink as demo default + futuristic globe effects (atmosphere rim glow, graticule, idle auto-rotate,
+> star field, fly-to sweep, each an opt-in prop) + settings pattern: `theme`/`projection` bindable props,
+> headless `mapSettings()` store, one optional unstyled `<Controls>`. `ORCH-sim`, `ORCH-app`,
+> `ORCH-book` are IDLE with STATUS printed; dev servers in tmux `surflab-dev` :5181, `surflab-app`
+> :5182, `surflab-book` :5183, `mapkit-dev` :5180 (tunnel: `ssh -f -N -L 5180:127.0.0.1:5180 … zulzi-gpu`).
+> Other ORCH-fv-*/footyviz sessions on zulzi belong to a peer session: never kill-all.
+>
+> **Blockers / definition-of-done:**
+> 1. Merge `app` + `book` into `main` (HANDOVER.md conflict only), pull on zulzi, re-point the app at the
+>    new renderer (`createRenderer`, `rampFrom`, `groupiness` — the app has stubs), swap the book's
+>    stand-ins, then one `bun run build` must pass on main with `/`, `/map`, `/spot/*`, `/book/*`.
+> 2. map-kit v0.1.1 tag once the install fix + ink default + effects land; surf-lab pins `#semver:^0.1.0`.
+> 3. Real-browser fps check on a laptop GPU (headless shows 0 fps): `/sim/cover?warm=400&across=2000&cx=-20&cy=-150&speed=4&groupiness=0.5` on :5181; 12.5 m (`?dx=12.5`) is the fallback.
+> 4. Deploy: CF Pages direct-upload project (e.g. `surf-lab`) + custom domain **surf.danielslater.dev**
+>    (proposed, not confirmed). Build on the Mac (`SURF_BOOK_DIR=~/dan-hub/surf-physics-book/chapters`).
+> 5. Confirm 5 catalogue coordinates the app line could not verify: Skeleton Bay, Lance's Right, Pasta
+>    Point, Punta de Lobos, Teahupo'o.
+>
+> **Open decisions awaiting Daniel:** public hostname; the cover's default framing (~2 km across) and
+> speed (~4×) proposed by the sim line; the look of the renderer (not yet seen by Daniel; headless Mac
+> shot of `/sim/cover` failed, take it in a real Chrome); whether the J-Bay foam band width is right.
+>
+> **Gotchas:**
+> - zulzi: `claude` login expired once (fixed by `/login` in a line + Daniel pasting the code; sim line
+>   needed a respawn to pick up creds). No `node`; bun at `~/.bun/bin`. `gh` NOT logged in on zulzi by
+>   design: lines commit, the Mac fetches `ssh://zulzi-gpu/~/code/<repo> +main:zulzi-main` and pushes.
+> - Lines `git pull --rebase` their own checkouts when told; that rewrites hashes, so always fetch with
+>   `+` and `reset --hard` the Mac copy to zulzi's main before pushing.
+> - `factory.sh approve <host> <line> 2` (don't-ask-again) is blocked by the Mac classifier; plain approve works.
+> - Headless Chrome on the Mac renders WebGPU pages but not MapLibre (WebGL) and reports 0 fps.
+> - Sim grid frame: along-shore axis, land on low-ix side, wavemaker ~1.3 km offshore; J-Bay pinned
+>   `rotationDeg: 0, maxObliquityDeg: 30` in the catalogue; store carries deep-water compass direction.
+>
+> **Next actions:** 1 merge app+book → main; 2 wake the sim/app/book lines with the integration tasks
+> (or kill them and use one line); 3 collect mapkit's results, tag v0.1.1; 4 build + deploy; 5 kill
+> own lines (`factory.sh kill zulzi-gpu <name>`), note the board.
+>
+> **Pointers:** this file's line blocks below; `src/lib/sim/{README,FRAME,PARITY}.md`;
+> `~/dan-hub/map-kit/{README,CHANGELOG,HANDOVER}.md` + `docs/`; `~/dan-hub/AGENTS-BOARD.md`;
+> briefs in the session scratchpad (`brief-*.md`, `sim-*.md`, `mapkit-*.md`); memories
+> `tmux-orchestrator-merged`, `surf-physics-review`, `site-editable-versioning-gate`.
+
 > ## BOOK LINE (build-order step 5), 2026-10-09: book done, main merged in, the 2-D instrument breaks on the MUSCL solver
 >
 > **Built (branch `book`, worktree `~/code/surf-lab-book`):** `/book` (contents, nine ledes) and
