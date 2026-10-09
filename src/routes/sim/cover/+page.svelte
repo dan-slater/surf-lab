@@ -74,18 +74,35 @@
 			r.setHs(solver.swell.Hs);
 			resize();
 			addEventListener('resize', resize);
+			if (q.get('bench') === '1') {
+				// throughput: N steps, then M frames of render + tracker, timed to GPU completion
+				await device.queue.onSubmittedWorkDone();
+				let t0 = performance.now();
+				solver.step(3000);
+				await device.queue.onSubmittedWorkDone();
+				const stepMs = (performance.now() - t0) / 3000;
+				t0 = performance.now();
+				for (let i = 0; i < 300; i++) {
+					r.draw(solver.time);
+					tracker.update();
+				}
+				await device.queue.onSubmittedWorkDone();
+				const frameMs = (performance.now() - t0) / 300;
+				(window as unknown as { __bench: unknown }).__bench = { stepMs, frameMs, cells: grid.nx * grid.ny, px: canvas.width * canvas.height };
+			}
 			const speed = Number(q.get('speed') ?? 10);
-			let owed = 0, prev = performance.now(), frames = 0, lastHud = prev, prev0 = prev;
+			const budget = solver.budget(Number(q.get('budget') ?? 16.7));
+			let prev = performance.now(), frames = 0, lastHud = prev, prev0 = prev, stepsSum = 0;
 			const frame = () => {
 				if (!alive || !solver) return;
 				const now = performance.now();
-				owed += (Math.min(now - prev, 100) / 1000) * speed;
+				const realDt = Math.min(now - prev, 100) / 1000;
 				prev = now;
-				const n = Math.floor(owed / solver.params.dt);
-				owed -= n * solver.params.dt;
-				if (n > 0) solver.step(n);
-				r.draw(solver.time);
-				tracker.update();
+				const n = budget.frame(realDt * speed, realDt, () => {
+					r.draw(solver!.time);
+					tracker.update();
+				});
+				stepsSum += n;
 				const fronts = tracker.fronts();
 				crowd.update(solver.time - lastModel, Math.min(now - prev0, 100) / 1000, fronts);
 				lastModel = solver.time;
@@ -141,8 +158,12 @@
 				(window as unknown as { __rides: unknown }).__rides = crowd.log;
 				frames++;
 				if (now - lastHud > 500) {
-					hud = `t ${solver.time.toFixed(0)} s, ${((frames * 1000) / (now - lastHud)).toFixed(0)} fps`;
+					const g = budget.governor;
+					hud = `t ${solver.time.toFixed(0)} s, ${((frames * 1000) / (now - lastHud)).toFixed(0)} fps, ${(stepsSum / frames).toFixed(1)} steps/frame, ` +
+						`${g.msPerStep.toFixed(3)} ms/step, ${g.msOther.toFixed(2)} ms render, level ${budget.level}`;
+					(window as unknown as { __perf: unknown }).__perf = { fps: (frames * 1000) / (now - lastHud), steps: stepsSum / frames, msPerStep: g.msPerStep, msOther: g.msOther, level: budget.level };
 					frames = 0;
+					stepsSum = 0;
 					lastHud = now;
 				}
 				raf = requestAnimationFrame(frame);

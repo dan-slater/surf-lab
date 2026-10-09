@@ -21,6 +21,7 @@ import {
 	type SolverOptions
 } from './config';
 import { statsFromSums } from './cpu';
+import { Governor, type BudgetLevel, type BudgetOptions } from './budget';
 import { thetaFromCompass, type Swell } from './swell';
 
 export type { SolverOptions } from './config';
@@ -37,6 +38,17 @@ export interface WaveStats {
 	/** fraction of samples with foam above the threshold */
 	foamFrac: Float32Array;
 	samples: number;
+}
+
+export interface SolverBudget {
+	readonly governor: Governor;
+	readonly level: BudgetLevel;
+	/**
+	 * One frame: advance by up to `modelSeconds` within the budget, then call
+	 * `render` (the renderer's draw and anything else on the GPU), and time the
+	 * GPU work to refine the plan. Returns the steps taken.
+	 */
+	frame(modelSeconds: number, realDt: number, render?: () => void): number;
 }
 
 export interface Solver {
@@ -77,6 +89,8 @@ export interface Solver {
 	startStats(): void;
 	stopStats(): void;
 	readStats(): Promise<WaveStats>;
+	/** a frame governor holding the solver and whatever `render` draws to `msPerFrame` of GPU time */
+	budget(msPerFrame: number, opts?: BudgetOptions): SolverBudget;
 	dispose(): void;
 }
 
@@ -333,6 +347,47 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		async readStats() {
 			const sums = await readBuffer(stats, N * 16);
 			return statsFromSums(sums, N, samples);
+		},
+		budget(msPerFrame: number, opts: BudgetOptions = {}): SolverBudget {
+			const gov = new Governor(msPerFrame, p.dt, opts);
+			let inFlight = false;
+			// the fixed latency of an onSubmittedWorkDone round trip, measured on an
+			// idle queue and subtracted, so a fast GPU is not charged for it
+			let latency = 0;
+			(async () => {
+				const v: number[] = [];
+				for (let i = 0; i < 7; i++) {
+					await device.queue.onSubmittedWorkDone();
+					const a = performance.now();
+					await device.queue.onSubmittedWorkDone();
+					v.push(performance.now() - a);
+				}
+				latency = v.sort((x, y) => x - y)[3];
+			})();
+			return {
+				governor: gov,
+				get level() {
+					return gov.level;
+				},
+				frame(modelSeconds: number, realDt: number, render?: () => void) {
+					const n = gov.plan(modelSeconds);
+					const t0 = performance.now();
+					if (n > 0) step(n);
+					// time this frame's GPU work unless the previous measurement is still out
+					const measure = !inFlight;
+					const done = measure ? device.queue.onSubmittedWorkDone().then(() => performance.now()) : null;
+					render?.();
+					if (measure && done) {
+						inFlight = true;
+						Promise.all([done, device.queue.onSubmittedWorkDone().then(() => performance.now())]).then(([a, b]) => {
+							const stepMs = Math.max(0.01 * n, a - t0 - latency);
+							gov.observe(stepMs, n, Math.max(stepMs, b - t0 - latency), realDt);
+							inFlight = false;
+						});
+					}
+					return n;
+				}
+			};
 		},
 		dispose() {
 			for (const b of [bed, stateA, stateB, stateS, comps, stats, params, dims]) b.destroy();
