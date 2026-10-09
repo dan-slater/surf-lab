@@ -11,7 +11,11 @@ export interface Swell {
 	Hs: number;
 	/** peak period (s) */
 	Tp: number;
-	/** compass direction the swell comes FROM (deg, 0 = north, 90 = east) */
+	/**
+	 * compass direction the swell comes FROM at the wavemaker (deg, 0 = north,
+	 * 90 = east). This is the local, refracted direction; convert a forecast's
+	 * deep-water direction with generatorDirection.
+	 */
 	dirDeg: number;
 	/** directional spread as the power n in cos^n(theta - theta0); Run A used 20. 0 = one direction */
 	spread: number;
@@ -121,4 +125,82 @@ export function swellComponents(
 		}
 	}
 	return out;
+}
+
+/** Linear phase speed (m/s) for period T (s) at depth d (m): omega^2 = g k tanh(k d). */
+export function phaseSpeed(T: number, d: number): number {
+	const w = (2 * Math.PI) / T;
+	if (!(d > 0)) return 0;
+	let k = Math.max((w * w) / G, w / Math.sqrt(G * d));
+	for (let i = 0; i < 60; i++) {
+		const th = Math.tanh(k * d);
+		const f = G * k * th - w * w;
+		const df = G * th + G * k * d * (1 - th * th);
+		const step = f / df;
+		k -= step;
+		if (Math.abs(step) < 1e-12 * k) break;
+	}
+	return w / k;
+}
+
+export interface GeneratorDirection {
+	/** compass FROM direction to give the solver (Swell.dirDeg) */
+	dirDeg: number;
+	/** compass FROM direction of a swell travelling straight onshore in this grid */
+	shoreNormalDeg: number;
+	/** deep-water angle from the shore normal (deg, + clockwise), before capping */
+	deepAngleDeg: number;
+	/** angle from the shore normal at the wavemaker (deg) */
+	localAngleDeg: number;
+	/** the deep-water swell comes from behind the coast (|deep angle| >= 90): it can only arrive by wrapping round a headland */
+	fromBehind: boolean;
+	/** the refracted angle was cut back to maxObliquityDeg */
+	clamped: boolean;
+}
+
+/**
+ * Turn a forecast's deep-water swell direction into the direction for the
+ * solver's wavemaker. The grid's +ix axis is the offshore shore normal (see
+ * FRAME.md), so a swell from compass `90 - rotationDeg` travels straight
+ * onshore. The deep-water angle from that normal is refracted to the
+ * wavemaker depth with Snell's law, sin(a) / c = constant, using linear phase
+ * speeds for period Tp.
+ *
+ * A deep-water swell from behind the coast (90 deg or more off the normal, as
+ * a SW swell is for east-facing J-Bay) cannot reach a straight shore. In
+ * reality it wraps round a headland and arrives at grazing incidence, so it is
+ * treated as 90 deg, which refracts to the largest angle the depth allows,
+ * asin(c / c0). Finally the angle is capped at maxObliquityDeg (default 45):
+ * at larger angles the crests run along the domain and reach the coast mostly
+ * through the along-shore sponges.
+ *
+ * J-Bay (rotation 0, 26.4 m at the wavemaker) with a 225 deg deep-water swell
+ * at Tp 15 s gives 129 deg; Run A used 120 deg (30 deg off the normal, a
+ * hand choice). Longer periods refract more: 18 s gives 123 deg.
+ */
+export function generatorDirection(
+	deepWaterDeg: number,
+	grid: { rotationDeg: number },
+	depthAtWavemaker: number,
+	opts: { Tp?: number; maxObliquityDeg?: number } = {}
+): GeneratorDirection {
+	const Tp = opts.Tp ?? 12;
+	const maxOb = opts.maxObliquityDeg ?? 45;
+	const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
+	const shoreNormalDeg = (((90 - grid.rotationDeg) % 360) + 360) % 360;
+	const deepAngleDeg = wrap180(deepWaterDeg - shoreNormalDeg);
+	const fromBehind = Math.abs(deepAngleDeg) >= 90;
+	const a0 = fromBehind ? Math.sign(deepAngleDeg || 1) * 90 : deepAngleDeg;
+	const ratio = phaseSpeed(Tp, depthAtWavemaker) / ((G * Tp) / (2 * Math.PI));
+	let local = (Math.asin(Math.min(1, ratio * Math.sin((a0 * Math.PI) / 180))) * 180) / Math.PI;
+	const clamped = Math.abs(local) > maxOb;
+	if (clamped) local = Math.sign(local) * maxOb;
+	return {
+		dirDeg: (((shoreNormalDeg + local) % 360) + 360) % 360,
+		shoreNormalDeg,
+		deepAngleDeg,
+		localAngleDeg: local,
+		fromBehind,
+		clamped
+	};
 }
