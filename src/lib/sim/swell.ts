@@ -25,6 +25,13 @@ export interface Swell {
 	seed?: number;
 	/** 'jonswap' (default) or 'mono': one regular wave of height Hs */
 	spectrum?: 'jonswap' | 'mono';
+	/**
+	 * Sets and lulls: how deep the lulls are, 0 (none beyond what the spectrum
+	 * makes on its own) to 1 (flat between sets). Default 0.
+	 */
+	groupiness?: number;
+	/** waves per set (6 to 12 typical, default 8); a set and a lull last 2 x groupWaves x Tp */
+	groupWaves?: number;
 }
 
 export interface WaveComponent {

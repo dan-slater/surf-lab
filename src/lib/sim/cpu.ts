@@ -5,7 +5,7 @@
  * State is stored in float32 like the GPU; arithmetic runs in float64, so the
  * two agree to rounding, not bit for bit. Change both together.
  */
-import { componentsFor, resolveParams, type Params, type SolverOptions } from './config';
+import { Ramp, componentsFor, envelopeAt, envelopeFor, resolveParams, type Params, type SolverOptions } from './config';
 import type { Swell, WaveComponent } from './swell';
 
 export interface CpuSolver {
@@ -18,6 +18,7 @@ export interface CpuSolver {
 	readonly time: number;
 	step(substeps?: number): void;
 	setSwell(swell: Swell): void;
+	rampFrom(level?: number, opts?: { seconds?: number; clock?: 'real' | 'model' }): void;
 	setDepth(depth: Float32Array): void;
 	readEta(): Float32Array;
 	readFoam(): Float32Array;
@@ -57,6 +58,7 @@ export function createCpuSolver(opts: SolverOptions): CpuSolver {
 	const stats = new Float64Array(N * 4);
 	let samples = 0;
 	let statsOn = false;
+	const ramp = new Ramp();
 
 	function rebuildWavemaker() {
 		bandCells = [];
@@ -356,7 +358,8 @@ export function createCpuSolver(opts: SolverOptions): CpuSolver {
 			wt[c] = Math.cos(comps[c].omega * t);
 			wt[nc + c] = Math.sin(comps[c].omega * t);
 		}
-		const env = 1 + p.envDepth * 0.5 * (Math.sin((2 * Math.PI * t) / Math.max(p.envPeriod, 1)) - 1);
+		const ev = envelopeFor(opt.swell, p);
+		const env = envelopeAt(t, ev.period, ev.depth, ramp.factor(t));
 		const s = cur;
 		if (p.scheme === 'first-order') {
 			for (let ix = 0; ix < nx; ix++)
@@ -429,6 +432,9 @@ export function createCpuSolver(opts: SolverOptions): CpuSolver {
 			}
 		},
 		setSwell,
+		rampFrom(level = 0, o: { seconds?: number; clock?: 'real' | 'model' } = {}) {
+			ramp.from(level, o.seconds ?? 20, o.clock ?? 'real', t);
+		},
 		setDepth(depth: Float32Array) {
 			t = 0;
 			setDepth(depth);

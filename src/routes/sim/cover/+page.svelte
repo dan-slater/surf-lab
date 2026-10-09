@@ -2,7 +2,8 @@
 	// Dev route for the product renderer. Query: ?warm=300 (model s before the
 	// first frame), ?speed=10 (model s per real s), ?dx=6.25, ?foam=0 (hide foam),
 	// ?across=4300 (m across the width), ?up=90 (compass bearing up the screen),
-	// ?cx=-150&cy=-300 (ENU centre), ?hud=0
+	// ?cx=-150&cy=-300 (ENU centre), ?hud=0, ?groupiness=0.6&groupWaves=8 (sets),
+	// ?ramp=20 (spin up from flat over 20 real s), ?surfers=8&seed=7, ?fronts=1, ?rig=1
 	import { bathyFromPolyline } from '#lib/sim/bathy.ts';
 	import { createSolver, type Solver } from '#lib/sim/solver.ts';
 	import { requestDevice } from '#lib/sim/gpu.ts';
@@ -29,11 +30,18 @@
 			const grid = jbayGrid(Number(q.get('dx') ?? 6.25));
 			const { depth } = bathyFromPolyline(JBAY.coast, grid);
 			solver = createSolver(device, {
-				nx: grid.nx, ny: grid.ny, dx: grid.dx, depth, swell: JBAY_RUN_A_SWELL,
+				nx: grid.nx, ny: grid.ny, dx: grid.dx, depth,
+				swell: {
+					...JBAY_RUN_A_SWELL,
+					groupiness: q.get('groupiness') ? Number(q.get('groupiness')) : undefined,
+					groupWaves: Number(q.get('groupWaves') ?? 8)
+				},
 				wavemaker: { width: 75 / grid.dx }, sponge: { width: 150 / grid.dx }
 			});
 			const warm = Number(q.get('warm') ?? 0);
 			if (warm > 0) solver.step(Math.round(warm / solver.params.dt));
+			// ?ramp=20: build the swell from flat over 20 s of real time
+			if (q.get('ramp')) solver.rampFrom(0, { seconds: Number(q.get('ramp')) });
 			const context = canvas.getContext('webgpu') as GPUCanvasContext;
 			const format = navigator.gpu.getPreferredCanvasFormat();
 			context.configure({ device, format, alphaMode: 'opaque' });

@@ -121,3 +121,39 @@ describe('CPU twin of step.wgsl', () => {
 		expect(foamCells).toBeGreaterThan(0);
 	}, 120000);
 });
+
+describe('sets, lulls and spin-up', () => {
+	const flat = (nx: number, ny: number, d: number) => new Float32Array(nx * ny).fill(d);
+	/** eta at the wavemaker edge over time */
+	function edgeSeries(opts: Partial<import('./config').SolverOptions>, seconds: number, setup?: (s: ReturnType<typeof createCpuSolver>) => void) {
+		const nx = 30, ny = 4, d = 20;
+		const s = createCpuSolver({ nx, ny, dx: 10, depth: flat(nx, ny, d), dt: 0.2, sponge: { width: 0 }, swell: { Hs: 1, Tp: 10, dirDeg: 90, spread: 0, spectrum: 'mono' }, ...opts });
+		setup?.(s);
+		const out: number[] = [];
+		for (let k = 0; k < seconds / 0.2; k++) {
+			s.step(1);
+			out.push(s.state[((nx - 1) * ny + 1) * 4] - d);
+		}
+		return out;
+	}
+	const maxIn = (a: number[], i0: number, i1: number) => Math.max(...a.slice(i0, i1).map(Math.abs));
+
+	test('groupiness makes sets and lulls with period 2 x groupWaves x Tp', () => {
+		const e = edgeSeries({ swell: { Hs: 1, Tp: 10, dirDeg: 90, spread: 0, spectrum: 'mono', groupiness: 0.9, groupWaves: 6 } }, 240);
+		// envelope period 120 s = 600 samples; compare the loudest and quietest 20 s windows
+		const win = 100;
+		const amps: number[] = [];
+		for (let i = 0; i + win <= e.length; i += 25) amps.push(maxIn(e, i, i + win));
+		expect(Math.min(...amps) / Math.max(...amps)).toBeLessThan(0.35);
+		const plain = edgeSeries({}, 240);
+		const pa: number[] = [];
+		for (let i = 0; i + win <= plain.length; i += 25) pa.push(maxIn(plain, i, i + win));
+		expect(Math.min(...pa) / Math.max(...pa)).toBeGreaterThan(0.9);
+	});
+
+	test('rampFrom(0) builds the swell from flat over the ramp time', () => {
+		const e = edgeSeries({}, 60, (s) => s.rampFrom(0, { seconds: 40, clock: 'model' }));
+		expect(maxIn(e, 0, 25)).toBeLessThan(0.05); // first 5 s: nearly flat
+		expect(maxIn(e, 250, 300)).toBeGreaterThan(0.4); // after 50 s: full height (H/2 = 0.5)
+	});
+});

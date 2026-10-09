@@ -171,16 +171,64 @@ export function suggestDt(maxDepth: number, dx: number, Hs = 3, courant = 0.4): 
 	return (courant * dx) / c;
 }
 
-export const PARAMS_BYTES = 80;
+export const PARAMS_BYTES = 96;
+
+/** The sets-and-lulls envelope for a swell: period (s) and depth 0..1. */
+export function envelopeFor(swell: Swell, p: Params): { period: number; depth: number } {
+	if (swell.groupiness === undefined) return { period: p.envPeriod, depth: p.envDepth };
+	return { period: 2 * (swell.groupWaves ?? 8) * swell.Tp, depth: Math.min(1, Math.max(0, swell.groupiness)) };
+}
+
+/** Wavemaker amplitude factor at time t: mirrors common.wgsl. */
+export function envelopeAt(t: number, period: number, depth: number, ramp = 1): number {
+	const w = (2 * Math.PI * t) / Math.max(period, 1);
+	const e = 0.5 + 0.5 * (0.7 * Math.sin(w) + 0.3 * Math.sin(1.618 * w + 1.3));
+	return ramp * (1 - depth * (1 - e));
+}
+
+/**
+ * Spin-up: the wavemaker amplitude rises from `level` to 1 over `seconds`,
+ * on the wall clock (default, so a new spot builds in the same real time at
+ * any model speed) or on model time.
+ */
+export class Ramp {
+	private start = 0;
+	private seconds = 0;
+	private level = 1;
+	private clock: 'real' | 'model' = 'real';
+	from(level: number, seconds: number, clock: 'real' | 'model', modelTime: number) {
+		this.level = Math.min(1, Math.max(0, level));
+		this.seconds = Math.max(seconds, 1e-3);
+		this.clock = clock;
+		this.start = clock === 'real' ? performance.now() / 1000 : modelTime;
+	}
+	factor(modelTime: number): number {
+		if (this.level >= 1) return 1;
+		const now = this.clock === 'real' ? performance.now() / 1000 : modelTime;
+		const u = Math.min(1, Math.max(0, (now - this.start) / this.seconds));
+		const f = this.level + (1 - this.level) * u * u * (3 - 2 * u);
+		if (u >= 1) this.level = 1;
+		return f;
+	}
+}
 export const COMP_BYTES = 32;
 
-export function packParams(p: Params, t: number, ncomp: number, dv: DataView, off = 0) {
+export function packParams(
+	p: Params,
+	t: number,
+	ncomp: number,
+	dv: DataView,
+	off = 0,
+	env: { period: number; depth: number } = { period: p.envPeriod, depth: p.envDepth },
+	ramp = 1
+) {
 	const u = [p.nx, p.ny, ncomp];
 	const f = [
 		p.dx, p.dt, p.g, p.manning,
 		t, p.relaxW, p.relaxMax, p.spongeW,
 		p.spongeRate, p.breakH, p.froudeT, p.steepT,
-		p.depthLimT, p.foamDecay, p.envPeriod, p.envDepth
+		p.depthLimT, p.foamDecay, env.period, env.depth,
+		ramp, 0, 0, 0
 	];
 	u.forEach((v, i) => dv.setUint32(off + i * 4, v, true));
 	dv.setFloat32(off + 12, p.breakHmin, true);

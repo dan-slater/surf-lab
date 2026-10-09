@@ -10,7 +10,10 @@ import musclWgsl from './muscl.wgsl?raw';
 import fieldsWgsl from './fields.wgsl?raw';
 import {
 	COMP_BYTES,
+	PARAMS_BYTES,
+	Ramp,
 	componentsFor,
+	envelopeFor,
 	packComponents,
 	packParams,
 	resolveParams,
@@ -54,6 +57,12 @@ export interface Solver {
 	/** advance by `substeps` steps of dt (default from options) */
 	step(substeps?: number): void;
 	setSwell(swell: Swell): void;
+	/**
+	 * Spin the swell up from `level` (0 = flat) to full over `seconds`
+	 * (default 20) of real time, or of model time with clock: 'model'. Call it
+	 * after setDepth or on a new solver so a spot builds from flat.
+	 */
+	rampFrom(level?: number, opts?: { seconds?: number; clock?: 'real' | 'model' }): void;
 	/** the current swell */
 	readonly swell: Swell;
 	/** unit travel direction of the swell in grid space (+ix, +iy) */
@@ -81,6 +90,7 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 	let ncomp = 0;
 	let statsOn = false;
 	let samples = 0;
+	const ramp = new Ramp();
 
 	const S = GPUBufferUsage.STORAGE;
 	const bed = device.createBuffer({ size: N * 4, usage: S | GPUBufferUsage.COPY_DST });
@@ -113,7 +123,7 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 	const C = GPUShaderStage.COMPUTE;
 	const stepLayout = device.createBindGroupLayout({
 		entries: [
-			{ binding: 0, visibility: C, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 80 } },
+			{ binding: 0, visibility: C, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: PARAMS_BYTES } },
 			{ binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 3, visibility: C, buffer: { type: 'storage' } },
@@ -149,7 +159,7 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		device.createBindGroup({
 			layout: stepLayout,
 			entries: [
-				{ binding: 0, resource: { buffer: params, size: 80 } },
+				{ binding: 0, resource: { buffer: params, size: PARAMS_BYTES } },
 				{ binding: 1, resource: { buffer: bed } },
 				{ binding: 2, resource: { buffer: src } },
 				{ binding: 3, resource: { buffer: dst } },
@@ -223,7 +233,11 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 	function step(n = p.substeps) {
 		while (n > 0) {
 			const k = Math.min(n, MAX_BATCH);
-			for (let i = 0; i < k; i++) packParams(p, t + (i + 1) * p.dt, ncomp, slotView, i * SLOT);
+			const env = envelopeFor(options.swell, p);
+			for (let i = 0; i < k; i++) {
+				const ti = t + (i + 1) * p.dt;
+				packParams(p, ti, ncomp, slotView, i * SLOT, env, ramp.factor(ti));
+			}
 			device.queue.writeBuffer(params, 0, slotBuf, 0, k * SLOT);
 			const enc = device.createCommandEncoder();
 			const pass = enc.beginComputePass();
@@ -285,6 +299,9 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		},
 		get swell() {
 			return options.swell;
+		},
+		rampFrom(level = 0, o: { seconds?: number; clock?: 'real' | 'model' } = {}) {
+			ramp.from(level, o.seconds ?? 20, o.clock ?? 'real', t);
 		},
 		swellDirection() {
 			const th = thetaFromCompass(options.swell.dirDeg, p.rotationDeg);

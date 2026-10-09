@@ -11,6 +11,7 @@ struct Params {
   t: f32, relaxW: f32, relaxMax: f32, spongeW: f32,
   spongeRate: f32, breakH: f32, froudeT: f32, steepT: f32,
   depthLimT: f32, foamDecay: f32, envPeriod: f32, envDepth: f32,
+  ramp: f32, p1: f32, p2: f32, p3: f32,
 };
 
 struct Comp { kx: f32, ky: f32, omega: f32, amp: f32, phase: f32, p0: f32, p1: f32, p2: f32 };
@@ -79,7 +80,11 @@ fn finish(ixi: i32, iyi: i32, nh0: f32, nhu0: f32, nhv0: f32) -> vec4<f32> {
   let band = f32(P.nx - 1u) - f32(ixi);
   if (band < P.relaxW && dC > 0.5) {
     let x = f32(ixi) * P.dx; let y = f32(iyi) * P.dx;
-    let env = 1.0 + P.envDepth * 0.5 * (sin(6.2831853 * P.t / max(P.envPeriod, 1.0)) - 1.0);
+    // sets and lulls: a slow, slightly irregular envelope (config.ts envelopeAt),
+    // times the spin-up ramp
+    let w = 6.2831853 * P.t / max(P.envPeriod, 1.0);
+    let e = 0.5 + 0.5 * (0.7 * sin(w) + 0.3 * sin(1.618 * w + 1.3));
+    let env = P.ramp * (1.0 - P.envDepth * (1.0 - e));
     let c = sqrt(P.g / dC);
     var etaT = 0.0; var uT = 0.0; var vT = 0.0;
     for (var i = 0u; i < P.ncomp; i++) {
