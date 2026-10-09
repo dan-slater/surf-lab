@@ -12,4 +12,12 @@ coastline polyline), `src/lib/instruments/` (P1–P6), `src/lib/spots/` (catalog
 `src/lib/forecast/` (Open-Meteo, cached), `content/` (book chapters, copied at build from
 the book repo).
 
-Status: scaffold. Read `HANDOVER.md` first.
+Status: the solver module and bathymetry builder exist (`src/lib/sim/`, dev route `/sim`);
+the rest is scaffold. Read `HANDOVER.md` first.
+
+```sh
+bun install
+bun run dev      # http://127.0.0.1:5181/sim
+bun test
+bun run build    # static site in build/
+```

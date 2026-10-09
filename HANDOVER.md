@@ -1,5 +1,50 @@
 # surf-lab — HANDOVER
 
+> ## SIM LINE (build-order step 2), 2026-10-09: module built, bathy exact, wave parity FAILS by design of first order
+>
+> **Built (all on `main`, zulzi-gpu):** SvelteKit 3 + Svelte 5 + adapter-static scaffold (bun; `#lib/*`
+> subpath imports since SvelteKit 3 dropped `$lib`); `src/lib/sim/`: `bathy.ts`
+> (`bathyFromPolyline`), `swell.ts` (JONSWAP components, compass <-> grid angles), `step.wgsl` +
+> `fields.wgsl` + `solver.ts` (`createSolver`, faithful Run C port with swell as a component
+> buffer, stats pass, fields texture), `cpu.ts` (CPU twin), `debug-render.ts` (plain painter with a
+> grid-to-clip affine for the map overlay); `/sim` and `/sim/parity` routes; `scripts/` for headless
+> GPU runs and parity. Docs: `src/lib/sim/{README,FRAME,PARITY}.md`.
+>
+> **Works, with evidence:** `bun run check` 0 errors, `bun run build` writes `build/`, `bun test` 11
+> pass. Bathy rebuilds Run A's `depth.f32` **bit-exactly** (max error 0 over 2.46 M cells) and the
+> Run C 192x512 grid exactly with `supersample: 5`. GPU matches the CPU twin to 1.2e-5 m. The 4090
+> runs 600 s of J-Bay model time in 0.32 s. Headless WebGPU on the 4090 works: Chrome spawned with
+> `--headless=new --no-sandbox` + Vulkan flags, attached over CDP (`scripts/browser.ts`); the first
+> `requestAdapter` returns null, so pages retry. Headless page screenshots do not composite WebGPU
+> canvases; `scripts/shot.ts` reads the canvas with `toDataURL`.
+>
+> **Does not work: J-Bay does not break.** First-order HLL at 12.5 m diffuses a 15 s swell with an
+> e-folding distance of ~265 m; the wavemaker is 1.3 to 1.5 km offshore. Interior Hs is 10 % of Run
+> A's (3 to 8 % inside 10 m depth), foam coverage 0.02 % vs 1.18 %, no break line at 4 of 8
+> sections. The ORIGINAL Run C demo, rebuilt in a scratchpad and captured, shows the same: its
+> "foam band" is a waterline fringe, not breaking (`docs/img/runc-original-t420.png`). Full
+> numbers: `src/lib/sim/PARITY.md`. `/sim` runs (60 fps, `?warm=300` skips spin-up) but shows
+> swell dying offshore.
+>
+> **MUSCL/RK2, what it would take (scoped OUT of this step by the brief; now the blocker for
+> "J-Bay breaking"):** port `surf-sim/solver/swe2d.py` `compute_L` (MUSCL-MC on eta/u/v, first order
+> at wet/dry fronts, Audusse on reconstructed states) into `step.wgsl` as an L(U) kernel, add a third
+> state buffer and run SSP-RK2 as two dispatches per step; mirror in `cpu.ts`; rerun the parity
+> scripts (minutes). About one day. Cost ~4x flux work per step, partly repaid by Run A's CFL 0.40
+> vs Run C's ~0.19; the GPU headroom is large (15 600 steps/s vs ~180 needed for 3 substeps at
+> 60 fps). Unknown until measured: whether 12.5 m is fine enough in the surf zone (a 15 s wave in
+> 3 m of water is ~6.5 cells long); 6.25 m (4x cells) may be needed. Keep first order as an option.
+>
+> **Open questions:** (1) go/no-go on MUSCL/RK2 in the browser (decides whether step 3 shows
+> breaking waves); (2) map-kit's exact `enuFrame` API (assumed `toLonLat`-style inverse in
+> `src/lib/sim/README.md`); (3) coast orientation from vector-tile water polygons (the builder
+> needs ocean on the right, FRAME.md).
+>
+> **Next for this line:** MUSCL/RK2 if approved, then parity rerun; breaking thresholds back toward
+> Run A's (0.40 / 0.60, d < 5 m) once waves arrive; a spatial index in `bathyFromPolyline` for
+> tile coastlines with thousands of vertices (now brute force, 20 ms for 72 vertices at 98 k cells).
+> Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim`.
+
 > ## 🌊 SURF-LAB + MAP-KIT: design settled, build via factory lines on zulzi (2026-10-08) — READ THIS FIRST
 >
 > **Goal:** turn the J-Bay GPU surf solver (`zulzi-gpu:~/surf-sim`) into a public web program
