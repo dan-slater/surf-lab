@@ -7,7 +7,10 @@ export default defineConfig({
 	plugins: [
 		sveltekit({
 			compilerOptions: { runes: true },
-			adapter: adapter({ pages: 'build', assets: 'build', strict: true })
+			// 404.html: Pages answers unknown paths with a real 404 instead of the
+			// index at 200; absolute /_app/ paths so a deep 404 still boots
+			adapter: adapter({ pages: 'build', assets: 'build', strict: true, fallback: '404.html' }),
+			paths: { relative: false }
 		})
 	],
 	// map-kit is consumed from its tagged source (src/lib); see src/lib/ui/README.md
