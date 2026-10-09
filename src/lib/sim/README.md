@@ -7,7 +7,8 @@ the reference run: [PARITY.md](PARITY.md).
 | file | what |
 |---|---|
 | `bathy.ts` | `bathyFromPolyline(coast, grid, recipe, overrides?, opts?)`: depth grid from an ENU coastline; `CoastIndex`, the segment hierarchy behind it |
-| `swell.ts` | `Swell` (Hs, Tp, compass direction, spread), JONSWAP components, angle conversions |
+| `grid.ts` | `gridFromCoast(polylines, opts)`: place a GridSpec on any coastline (FRAME.md) |
+| `swell.ts` | `Swell` (Hs, Tp, compass direction, spread), JONSWAP components, angle conversions, `generatorDirection` (forecast deep-water direction to wavemaker direction) |
 | `config.ts` | `SolverOptions`, defaults, `breakingDefaults`, `suggestDt`, uniform packing |
 | `common.wgsl` | uniforms, bindings and `finish`: friction, foam, breaking, wavemaker, sponges |
 | `muscl.wgsl` | scheme `'muscl'` (default): MUSCL-MC + Audusse + HLL, SSP-RK2 as two dispatches per step (Run A's core) |
@@ -89,8 +90,12 @@ async function onready(frame: OverlayFrame) {
 	const context = frame.gpu!.context as GPUCanvasContext;
 	const format = frame.gpu!.format as GPUTextureFormat;
 	const coast = await coastlineNear(frame.map, { lon, lat, radiusMeters: 4000, classes: ['ocean'] });
-	const grid = /* a GridSpec in coast.frame's ENU metres, land on the low-ix side (FRAME.md) */;
-	const { depth } = bathyFromPolyline(coast.polylines.map((p) => p.points), grid, JBAY_RECIPE, {}, { oceanSide: 'left' });
+	const lines = coast.polylines.map((p) => p.points);
+	grid = gridFromCoast(lines, { dx: 6.25, oceanSide: 'left' }).grid;
+	const { depth } = bathyFromPolyline(lines, grid, JBAY_RECIPE, {}, { oceanSide: 'left' });
+	// the forecast gives a deep-water direction; the wavemaker wants the local one
+	const dir = generatorDirection(forecast.dirDeg, grid, wavemakerDepth(depth, grid.nx, grid.ny, 12), { Tp: forecast.Tp });
+	const swell = { Hs: forecast.Hs, Tp: forecast.Tp, dirDeg: dir.dirDeg, spread: 20 };
 	solver = createSolver(device, { nx: grid.nx, ny: grid.ny, dx: grid.dx, depth, swell, rotationDeg: grid.rotationDeg });
 	painter = createDebugRenderer(solver, { context, format });
 }
@@ -107,8 +112,8 @@ and treats the map as affine across the domain. map-kit's own docs recommend
 this; it stops being exact under globe curvature, which is far below a pixel
 over a few kilometres at the zoom a spot is viewed at.
 
-Choosing the grid from a clicked coast (orientation so the land is on the
-low-ix side, rotation from the local coast direction) is step 3's job.
+`gridFromCoast` guarantees 1 km of water in front of the middle half of the
+domain; check `info.squeezed` and `info.minWater` for coasts that do not fit.
 
 ## Known limits
 

@@ -49,7 +49,7 @@ its 1201 frames and block-averaged to 12.5 m; the 6.25 m run is block-averaged
 | dt (Courant at 40 m) | 0.126 s (0.2) | 0.252 s (0.4) | 0.126 s (0.4) |
 | breaking | Run C: Fr > 0.30, slope > 0.10, eta/h > 0.22, h < 7 m | Run A, Fr > 0.35 | Run A, Fr > 0.50 |
 | 600 s of model time on the 4090 | 0.30 s | 0.31 s | 0.44 s |
-| GPU vs CPU twin, max abs h after 200 steps | 1.1e-5 m | 1.8e-4 m | (twin not run at 6.25 m) |
+| GPU vs CPU twin, max abs h after 200 steps | 1.1e-5 m | 1.8e-4 m | (see below) |
 
 "Run A" breaking is Run A's criterion (depth below 5 m and above 0.2 m, surface
 slope above 0.40 or Froude number above the threshold, foam half-life 4 s) with
@@ -61,6 +61,16 @@ foam cover 0.22 / 0.48 / 0.65 / 0.85 / 1.13 % (Run A 1.18 %), and at 6.25 m
 down to 0.05 made no difference at 12.5 m: a central difference over 25 m
 cannot see a bore face. Halving dt (0.12 s at 12.5 m, 0.06 s at 6.25 m) moved
 the Hs ratios by at most 0.01 and the foam shares by at most 0.3 points.
+
+**CPU twin at 6.25 m.** The full 600 s MUSCL run was repeated on the CPU twin
+(`bun scripts/parity-cpu.ts 480 120 parity-out/cpu-muscl-6.25.json muscl 6.25`,
+803 s wall on one core of zulzi-gpu against 0.44 s on the 4090). Over the
+interior, its statistics against the GPU run's: Hs mean 1.6349 m on both,
+RMS difference 0.1 mm, largest 0.6 mm; mean foam and foam time share differ by
+0.0001 RMS (largest 0.007 and 0.014 at single cells), correlation 1.0000. Every
+figure in the tables below comes out the same from either run. The two engines
+start from the same phases (same seeded generator), and float32 rounding
+differences stay in the noise of a 120 s average.
 
 ### Hs by depth band, ratio to Run A
 

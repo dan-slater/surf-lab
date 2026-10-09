@@ -1,46 +1,43 @@
 # surf-lab — HANDOVER
 
-> ## SIM LINE (build-order step 2), 2026-10-09: DONE. MUSCL/RK2 in, J-Bay breaks, parity with Run A at 6.25 m
+> ## SIM LINE, 2026-10-09: step 2 accepted; grid-from-coast, swell-direction conversion and the CPU parity run DONE
 >
-> **Built (all on `main`):** SvelteKit 3 + Svelte 5 + adapter-static scaffold (bun, `#lib/*` subpath
-> imports). `src/lib/sim/`: `bathy.ts` (`bathyFromPolyline`, `oceanSide` option, `CoastIndex` segment
-> BVH), `swell.ts`, `config.ts` (`scheme`, `breakingDefaults`, `suggestDt`), `common.wgsl` +
-> `muscl.wgsl` (default: Run A's MUSCL-MC + SSP-RK2, two dispatches per step) + `step.wgsl`
-> (`scheme: 'first-order'`, Run C), `fields.wgsl`, `solver.ts` (`createSolver(device, ...)` on a
-> caller-owned device; `fields` texture, `buffers`, stats), `cpu.ts` (CPU twin of both schemes),
-> `debug-render.ts` (draws into a canvas or an already-configured context; `affineFromOverlay` for
-> map-kit's frame). Routes `/sim` (`?warm ?speed ?dx ?scheme ?external ?hs ?tp ?dir`) and
-> `/sim/parity`. Docs `src/lib/sim/{README,FRAME,PARITY}.md`.
+> **New since step 2 was accepted (on `main`):**
+> - `src/lib/sim/grid.ts`, `gridFromCoast(polylines, { dx, nx, ny, oceanSide, center, rotationDeg? })`:
+>   returns `{ grid, toEnu, fromEnu, info }`. Shore along iy, land at low ix. Rotation starts from the
+>   centre-weighted principal axis, then turns so the wavemaker line runs parallel to the depth
+>   contours in front of the spot (it minimises the spread of coast distance along it over the core,
+>   the middle half along shore). The coast sits at 35 % of the width, with at least 1 km of water and
+>   150 m of land over the core; if both cannot hold, water wins and `info.squeezed` is set.
+>   `rotationDeg` pins a hand-chosen frame (catalogue spots).
+> - `swell.ts`, `generatorDirection(deepWaterDeg, grid, depthAtWavemaker, { Tp, maxObliquityDeg })`:
+>   Snell refraction from the forecast's deep-water direction to the wavemaker. Swell from behind the
+>   coast (90 deg or more off the shore normal) is treated as grazing, after wrapping round a headland.
+>   The result is capped at 45 deg. `Swell.dirDeg` is documented as the wavemaker (local) direction.
+> - CPU-twin parity at 6.25 m: 803 s wall; statistics equal to the GPU run's (Hs RMS difference 0.1 mm).
+> - FRAME.md documents both helpers; README.md has the overlay snippet using them.
 >
-> **Evidence:** `bun run check` 0 errors; `bun run build` ok; `bun test` 16 pass (lake at rest and
-> wave speed for both schemes, MUSCL keeps more than 85 % over 500 m, index exactly equals brute force).
-> Bathymetry is bit-exact against Run A's `depth.f32`. Against Run A on J-Bay (GPU, headless Chrome on the
-> 4090): **MUSCL 6.25 m:** interior Hs 91 % of Run A (98 % inside 3 m), 8 of 8 sections break, foam
-> cover 1.34 % vs 1.18 %, 600 s of model time in 0.44 s. **MUSCL 12.5 m:** 79 %, 6 of 8, 0.31 s.
-> **First order 12.5 m:** 10 %, none, kept as an option only. Images in `docs/img/`.
+> **Evidence:** `bun run check` 0 errors, `bun run build` ok, `bun test` 28 pass (16 before, plus 8
+> grid, 4 swell).
 >
-> **Decisions made here (review):** the default grid for J-Bay is 6.25 m (384 x 1024), with 12.5 m as
-> the weak-GPU fallback. The default dt is Courant 0.4 (0.126 s at 6.25 m). The Froude breaking threshold
-> scales with the grid (`0.65 - 0.024 dx`: 0.50 at 6.25 m, 0.35 at 12.5 m) and was fitted to Run A's
-> foam cover on this one run. Break-line positions were not fitted and land 0 to 25 m seaward of
-> Run A's.
+> **Two acceptance targets not met as worded, on purpose (review):**
+> 1. "Reproduce the J-Bay frame to within a cell": the helper gives rotation 1.4 deg, centre 23 m off,
+>    farthest corner 106 m off (6.25 m cells). With `rotationDeg: 0` pinned, every corner is within
+>    27 m (4 cells at 6.25 m, 2 at 12.5 m). Run A's frame was drawn ENU-aligned by convention, and
+>    J-Bay's shore turns through ~30 deg over 6 km, so any rule's rotation depends on how much coast
+>    it weighs (0.98 deg at sigma 1 km, -6.9 deg at 1.6 km on the principal axis alone). I did not
+>    tune constants to hit 0. Tests assert < 2 deg and < 30 m.
+> 2. "J-Bay 225 deg must land near 120 deg": it lands at **129 deg** (Tp 15 s; 139 at 12 s, 123 at
+>    18 s). 225 deg is 135 deg off J-Bay's shore normal, from behind the coast, so plain Snell has no
+>    answer; the grazing rule gives the largest angle the depth allows, asin(c/c0). Run A's 120 deg
+>    is 30 deg off the normal, a hand choice; `maxObliquityDeg: 30` reproduces it. Tests assert
+>    within 10 deg.
 >
-> **For step 3 (mounting in the map overlay):** `createSolver(frame.gpu.device, ...)`, then
-> `createDebugRenderer(solver, { context, format })`, and `affineFromOverlay(grid, coast.frame, frame)`
-> in `ondraw`. `coastlineNear` polylines go in as one array with `{ oceanSide: 'left' }`; the index
-> handles thousands of vertices (4000-vertex coast, 24 k cells: 15 ms, brute force 268 ms).
-> Still to build: choosing a GridSpec (rotation, land on the low-ix side) from a clicked coast, and
-> the product renderer. Snippet in `src/lib/sim/README.md`.
+> **Still standing from step 2:** 6.25 m default, Froude rule fitted to one run, the Mac fps check of
+> `/sim?warm=300` pending. Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim?warm=300`.
 >
-> **Open questions:** (1) whether laptop GPUs hold 6.25 m in real time (needs ~8 steps/s of 393 k
-> cells; the 4090 does ~11 000 steps/s; worth a Mac check of `/sim`, fps is on the page);
-> (2) whether the random sea state should reproduce Run A's exactly (it uses a different PRNG
-> from numpy's, so the statistics agree and the individual crests do not).
->
-> **Next for this line, if wanted:** a GridSpec-from-coast helper for the click-any-coast flow;
-> per-spot breaking calibration in the catalogue; a CPU-twin parity run at 6.25 m (about 15 min,
-> not done; the GPU and twin agree at 12.5 m).
-> Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim?warm=300`.
+> **Next for this line, if wanted:** per-spot calibration fields in the catalogue (pinned rotation,
+> breaking threshold, max obliquity); a `/sim?lon=&lat=` dev path once map-kit can be consumed.
 
 > ## 🌊 SURF-LAB + MAP-KIT: design settled, build via factory lines on zulzi (2026-10-08) — READ THIS FIRST
 >
