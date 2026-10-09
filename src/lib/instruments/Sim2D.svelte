@@ -119,6 +119,7 @@
 	img,
 	canvas {
 		display: block;
+		box-sizing: border-box;
 		width: 100%;
 		height: auto;
 		border: 1px solid var(--line, rgba(122, 197, 200, 0.16));

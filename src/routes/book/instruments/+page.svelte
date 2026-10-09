@@ -3,11 +3,17 @@
 	page the screenshot script walks (scripts/shoot-instruments.ts).
 -->
 <script lang="ts">
-	import { DEFAULT_SWELL, INSTRUMENTS } from '#lib/instruments/index.ts';
+	import { DEFAULT_SWELL, CHAPTER_SWELL, INSTRUMENTS, instrumentsInChapter } from '#lib/instruments/index.ts';
+	import { CHAPTER_ORDER } from '../order';
 	import LazyMount from '../LazyMount.svelte';
 
 	const swell = { ...DEFAULT_SWELL };
 	const list = Object.values(INSTRUMENTS);
+	// each instrument as it first appears in the book: its chapter's swell and worked-number props
+	const home = new Map<string, { swell: typeof swell; props: Record<string, unknown> }>();
+	for (const slug of CHAPTER_ORDER)
+		for (const e of instrumentsInChapter(slug))
+			if (!home.has(e.id)) home.set(e.id, { swell: { ...DEFAULT_SWELL, ...CHAPTER_SWELL[slug] }, props: e.props ?? {} });
 </script>
 
 <svelte:head><title>Instruments · The Surf Physics Review</title></svelte:head>
@@ -16,13 +22,14 @@
 	<p><a href="/book">← The Surf Physics Review</a></p>
 	<h1>Instruments</h1>
 	<p class="note">
-		All {list.length} at J-Bay's default swell, H<sub>s</sub> {swell.Hs} m, T<sub>p</sub> {swell.Tp} s, from {swell.dirDeg}°.
-		P1 to P6 are lifted from the research notes; the rest are built from their chapter's own equations.
+		All {list.length}, each set up as it first appears in the book: J-Bay's swell (H<sub>s</sub> {swell.Hs} m, T<sub>p</sub>
+		{swell.Tp} s, from {swell.dirDeg}°) unless its chapter works one example swell throughout. P1 to P6 are lifted from the
+		research notes; the rest are built from their chapter's own equations.
 	</p>
 	{#each list as def (def.id)}
 		<section id="i-{def.id}" data-instrument={def.id}>
 			<LazyMount minHeight="24rem">
-				<def.component {...swell} />
+				<def.component {...home.get(def.id)?.swell ?? swell} {...home.get(def.id)?.props} />
 			</LazyMount>
 		</section>
 	{/each}

@@ -1,9 +1,8 @@
 // Build-time chapter loader. Reads content/chapters/*.json (copied from the
 // Surf Physics Review by scripts/sync-content.mjs) and renders the LaTeX to
-// KaTeX HTML on the server, so prerendered pages ship finished maths and no
-// KaTeX JavaScript. Math is rendered on the raw strings, before any HTML
-// parse, because some body_html math holds a bare `<` (e.g. \(u < c\)).
-import katex from 'katex';
+// KaTeX HTML on the server (math.ts), so prerendered pages ship finished maths
+// and no KaTeX JavaScript.
+import { bodyHtml, displayLatex, escapeHtml, plain, text } from './math';
 import { CHAPTER_ORDER, type ChapterSlug } from './order';
 
 interface RawSection {
@@ -47,48 +46,6 @@ function raw(slug: ChapterSlug): RawChapter {
 	return c;
 }
 
-const escapeHtml = (s: string) =>
-	s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-function tex(src: string, displayMode: boolean): string {
-	return katex.renderToString(src.trim(), { displayMode, throwOnError: false, strict: 'ignore' });
-}
-
-const MATH = /\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)/g;
-
-/**
- * Render \( \) and \[ \] math in a string. Text between the math is passed
- * through `between` (identity for HTML fields, escaping for plain text).
- */
-function renderMath(s: string, between: (t: string) => string): string {
-	let out = '';
-	let last = 0;
-	for (const m of s.matchAll(MATH)) {
-		out += between(s.slice(last, m.index));
-		out += m[1] !== undefined ? tex(m[1], true) : tex(m[2], false);
-		last = m.index + m[0].length;
-	}
-	return out + between(s.slice(last));
-}
-
-const SLUGS = new Set<string>(CHAPTER_ORDER);
-
-/** Citation markers [n] become links to the reference list; #slug links become chapter routes. */
-function linkHtml(html: string): string {
-	return html
-		.replace(/\[(\d+)\]/g, '<a class="cite" href="#ref-$1">[$1]</a>')
-		.replace(/href="#([a-z]+)"/g, (whole, slug: string) => (SLUGS.has(slug) ? `href="/book/${slug}"` : whole));
-}
-
-const text = (s: string | undefined) => renderMath(s ?? '', (t) => linkHtml(escapeHtml(t)));
-const plain = (s: string | undefined) => renderMath(s ?? '', escapeHtml);
-
-/** A key equation's latex may arrive bare or wrapped in \[ \]. */
-function displayLatex(src: string): string {
-	const m = src.trim().match(/^\\\[([\s\S]*)\\\]$/);
-	return tex(m ? m[1] : src, true);
-}
-
 export const slugify = (s: string) =>
 	s
 		.toLowerCase()
@@ -109,7 +66,7 @@ export function loadChapter(slug: ChapterSlug): Chapter {
 		sections: c.sections.map((s) => ({
 			id: slugify(s.heading),
 			heading: s.heading,
-			html: renderMath(s.body_html, linkHtml),
+			html: bodyHtml(s.body_html),
 			onTheWave: text(s.on_the_wave),
 			diagramSpec: plain(s.diagram_spec)
 		})),

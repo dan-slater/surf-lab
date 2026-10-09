@@ -82,13 +82,20 @@
 		}
 		// water at the current level
 		const shoreX = level >= 0 ? -level / S_IN : xAt(-level);
-		ctx.fillStyle = COL.a(COL.teal, 0.1);
+		ctx.fillStyle = COL.a(COL.teal, 0.16);
 		ctx.beginPath();
 		ctx.moveTo(PX(xMax), PY(-level));
 		ctx.lineTo(PX(Math.max(shoreX, -40)), PY(-level));
 		for (let x = Math.max(shoreX, -40); x <= xMax; x += 2) ctx.lineTo(PX(x), PY(x >= 0 ? bed(x) : x * S_IN));
 		ctx.closePath();
 		ctx.fill();
+		// the bed line, and the slope break between terrace and step
+		ctx.strokeStyle = COL.a(COL.coast, 0.7);
+		ctx.lineWidth = 1.4;
+		ctx.beginPath();
+		for (let x = xMax; x >= -40; x -= 2) ctx.lineTo(PX(x), PY(x >= 0 ? bed(x) : x * S_IN));
+		ctx.stroke();
+		dot(ctx, PX(xAt(STEP_DEPTH)), PY(STEP_DEPTH), 3, COL.gold);
 		ctx.strokeStyle = COL.teal;
 		ctx.lineWidth = 1.6;
 		ctx.beginPath();

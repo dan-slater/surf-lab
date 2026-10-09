@@ -38,7 +38,7 @@
 	{#if figure}
 		{@render figure()}
 	{:else}
-		<canvas bind:this={canvas} style:aspect-ratio="{W} / {H}"></canvas>
+		<div class="scroll"><canvas bind:this={canvas} style:aspect-ratio="{W} / {H}"></canvas></div>
 	{/if}
 	{#if controls}<div class="controls">{@render controls()}</div>{/if}
 	{#if readout}<div class="readout">{@html readout}</div>{/if}
@@ -76,11 +76,21 @@
 	}
 	canvas {
 		display: block;
+		box-sizing: border-box;
 		width: 100%;
 		height: auto;
 		background: var(--ink, #071019);
 		border: 1px solid var(--line, rgba(122, 197, 200, 0.16));
 		border-radius: 4px;
+	}
+	/* on a phone keep labels legible: the canvas keeps a minimum width and scrolls sideways */
+	.scroll {
+		overflow-x: auto;
+	}
+	@media (max-width: 640px) {
+		canvas {
+			min-width: 600px;
+		}
 	}
 	.controls {
 		display: flex;
