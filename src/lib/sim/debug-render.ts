@@ -39,22 +39,71 @@ export function affineFromProjection(
 	return [a, b, o[0], d, e, o[1]];
 }
 
+/** The parts of map-kit's OverlayFrame this module uses (structural, no import). */
+export interface OverlayLike {
+	project(lon: number, lat: number): { x: number; y: number };
+	/** canvas size in the same pixels `project` returns (CSS pixels for map-kit) */
+	width: number;
+	height: number;
+}
+
+/** The parts of map-kit's EnuFrame this module uses. */
+export interface EnuLike {
+	toLonLat(x: number, y: number): [number, number];
+}
+
+/**
+ * Affine for a map-kit `<Overlay>`: grid -> ENU (GridSpec) -> lon/lat
+ * (enuFrame.toLonLat) -> canvas pixels (frame.project) -> clip. Recompute it
+ * in ondraw whenever the camera moves.
+ */
+export function affineFromOverlay(grid: GridSpec, enu: EnuLike, frame: OverlayLike): Affine {
+	return affineFromProjection(
+		grid,
+		(x, y) => {
+			const [lon, lat] = enu.toLonLat(x, y);
+			const p = frame.project(lon, lat);
+			return [p.x, p.y];
+		},
+		frame.width,
+		frame.height
+	);
+}
+
+/** Draw into a context someone else configured, such as map-kit's overlay (frame.gpu). */
+export interface ExternalTarget {
+	context: GPUCanvasContext;
+	format: GPUTextureFormat;
+}
+
 export interface DebugRenderer {
 	draw(): void;
 	setAffine(m: Affine): void;
 	dispose(): void;
 }
 
+/**
+ * @param target a canvas (configured here, on the solver's device) or an
+ *   already-configured context and its format (left as it is)
+ */
 export function createDebugRenderer(
-	device: GPUDevice,
-	canvas: HTMLCanvasElement | OffscreenCanvas,
 	solver: Solver,
+	target: HTMLCanvasElement | OffscreenCanvas | ExternalTarget,
 	opts: { affine?: Affine; etaScale?: number } = {}
 ): DebugRenderer {
+	const device = solver.device;
 	const { nx, ny } = solver.params;
-	const ctx = canvas.getContext('webgpu') as GPUCanvasContext;
-	const format = navigator.gpu.getPreferredCanvasFormat();
-	ctx.configure({ device, format, alphaMode: 'premultiplied' });
+	const owned = !('context' in target);
+	let ctx: GPUCanvasContext;
+	let format: GPUTextureFormat;
+	if ('context' in target) {
+		ctx = target.context;
+		format = target.format;
+	} else {
+		ctx = target.getContext('webgpu') as GPUCanvasContext;
+		format = navigator.gpu.getPreferredCanvasFormat();
+		ctx.configure({ device, format, alphaMode: 'premultiplied' });
+	}
 	const ubo = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 	const setAffine = (m: Affine) =>
 		device.queue.writeBuffer(ubo, 0, new Float32Array([m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, nx, ny, opts.etaScale ?? 0.6, 0]));
@@ -89,7 +138,7 @@ export function createDebugRenderer(
 		setAffine,
 		dispose() {
 			ubo.destroy();
-			ctx.unconfigure();
+			if (owned) ctx.unconfigure();
 		}
 	};
 }

@@ -134,34 +134,163 @@ function flatten(coast: Polyline | Polyline[]): Segments {
 	return seg;
 }
 
-/**
- * Signed distance from (px, py) to the nearest segment, positive on the right
- * (ocean) side, plus the arc length of the nearest point. Ties keep the first
- * segment, matching the reference implementation.
- */
-function nearest(seg: Segments, px: number, py: number): { s: number; arc: number } {
-	let best = Infinity;
-	let sign = 1;
-	let arc = 0;
-	for (let k = 0; k < seg.n; k++) {
-		const abx = seg.bx[k] - seg.ax[k];
-		const aby = seg.by[k] - seg.ay[k];
-		const l2 = abx * abx + aby * aby;
-		if (l2 < 1e-9) continue;
-		const apx = px - seg.ax[k];
-		const apy = py - seg.ay[k];
-		let t = (apx * abx + apy * aby) / l2;
-		t = t < 0 ? 0 : t > 1 ? 1 : t;
-		const dx = apx - t * abx;
-		const dy = apy - t * aby;
-		const d2 = dx * dx + dy * dy;
-		if (d2 < best) {
-			best = d2;
-			sign = abx * apy - aby * apx < 0 ? 1 : -1;
-			arc = seg.a0[k] + t * Math.sqrt(l2);
-		}
+/** Squared distance from (px, py) to segment k and the clamped parameter t. */
+function segDist2(seg: Segments, k: number, px: number, py: number, out: { d2: number; t: number }) {
+	const abx = seg.bx[k] - seg.ax[k];
+	const aby = seg.by[k] - seg.ay[k];
+	const l2 = abx * abx + aby * aby;
+	if (l2 < 1e-9) {
+		out.d2 = Infinity;
+		return;
 	}
-	return { s: Math.sqrt(best) * sign, arc };
+	const apx = px - seg.ax[k];
+	const apy = py - seg.ay[k];
+	let t = (apx * abx + apy * aby) / l2;
+	t = t < 0 ? 0 : t > 1 ? 1 : t;
+	const dx = apx - t * abx;
+	const dy = apy - t * aby;
+	out.d2 = dx * dx + dy * dy;
+	out.t = t;
+}
+
+const LEAF = 8;
+
+/**
+ * Nearest-segment search over a coastline: a bounding-volume hierarchy with
+ * branch-and-bound, so the cost per query grows with log(segments) rather than
+ * the segment count. Ties go to the lowest segment index, the brute-force (and
+ * reference) rule, so both searches return identical results.
+ */
+export class CoastIndex {
+	readonly seg: Segments;
+	private order: Int32Array;
+	private box: Float64Array; // per node: minx, miny, maxx, maxy
+	private kids: Int32Array; // per node: left, right (-1 for a leaf)
+	private span: Int32Array; // per node: start, count into order
+	private nodes = 0;
+	private stack = new Int32Array(128);
+	private tmp = { d2: 0, t: 0 };
+	/** +1: ocean on the right of the direction of travel; -1: on the left */
+	private side: number;
+
+	constructor(coast: Polyline | Polyline[], oceanSide: 'left' | 'right' = 'right') {
+		this.seg = flatten(coast);
+		this.side = oceanSide === 'right' ? 1 : -1;
+		const n = this.seg.n;
+		this.order = new Int32Array(n);
+		for (let i = 0; i < n; i++) this.order[i] = i;
+		const maxNodes = 2 * n + 1;
+		this.box = new Float64Array(maxNodes * 4);
+		this.kids = new Int32Array(maxNodes * 2);
+		this.span = new Int32Array(maxNodes * 2);
+		if (n > 0) this.build(0, n);
+	}
+
+	private build(start: number, count: number): number {
+		const node = this.nodes++;
+		const { ax, ay, bx, by } = this.seg;
+		let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+		for (let i = start; i < start + count; i++) {
+			const k = this.order[i];
+			x0 = Math.min(x0, ax[k], bx[k]);
+			y0 = Math.min(y0, ay[k], by[k]);
+			x1 = Math.max(x1, ax[k], bx[k]);
+			y1 = Math.max(y1, ay[k], by[k]);
+		}
+		this.box.set([x0, y0, x1, y1], node * 4);
+		this.span[node * 2] = start;
+		this.span[node * 2 + 1] = count;
+		if (count <= LEAF) {
+			this.kids[node * 2] = this.kids[node * 2 + 1] = -1;
+			return node;
+		}
+		// split at the median centroid along the longer side
+		const useX = x1 - x0 >= y1 - y0;
+		const sub = Array.from(this.order.subarray(start, start + count));
+		sub.sort((p, q) => (useX ? ax[p] + bx[p] - ax[q] - bx[q] : ay[p] + by[p] - ay[q] - by[q]));
+		this.order.set(sub, start);
+		const half = count >> 1;
+		this.kids[node * 2] = this.build(start, half);
+		this.kids[node * 2 + 1] = this.build(start + half, count - half);
+		return node;
+	}
+
+	private boxDist2(node: number, px: number, py: number): number {
+		const o = node * 4;
+		const dx = px < this.box[o] ? this.box[o] - px : px > this.box[o + 2] ? px - this.box[o + 2] : 0;
+		const dy = py < this.box[o + 1] ? this.box[o + 1] - py : py > this.box[o + 3] ? py - this.box[o + 3] : 0;
+		return dx * dx + dy * dy;
+	}
+
+	/** Index of the nearest segment (lowest index on ties) and its t, via the hierarchy. */
+	private search(px: number, py: number): { k: number; t: number; d2: number } {
+		let best = Infinity, bestK = -1, bestT = 0;
+		let sp = 0;
+		if (this.nodes) this.stack[sp++] = 0;
+		while (sp > 0) {
+			const node = this.stack[--sp];
+			if (this.boxDist2(node, px, py) > best) continue;
+			const l = this.kids[node * 2];
+			if (l < 0) {
+				const start = this.span[node * 2], end = start + this.span[node * 2 + 1];
+				for (let i = start; i < end; i++) {
+					const k = this.order[i];
+					segDist2(this.seg, k, px, py, this.tmp);
+					if (this.tmp.d2 < best || (this.tmp.d2 === best && k < bestK)) {
+						best = this.tmp.d2;
+						bestK = k;
+						bestT = this.tmp.t;
+					}
+				}
+				continue;
+			}
+			const r = this.kids[node * 2 + 1];
+			const dl = this.boxDist2(l, px, py), dr = this.boxDist2(r, px, py);
+			// push the farther child first so the nearer one is searched first
+			if (sp + 2 > this.stack.length) {
+				const grown = new Int32Array(this.stack.length * 2);
+				grown.set(this.stack);
+				this.stack = grown;
+			}
+			if (dl <= dr) {
+				this.stack[sp++] = r;
+				this.stack[sp++] = l;
+			} else {
+				this.stack[sp++] = l;
+				this.stack[sp++] = r;
+			}
+		}
+		return { k: bestK, t: bestT, d2: best };
+	}
+
+	/** Same answer as search(), by checking every segment. For tests. */
+	searchBrute(px: number, py: number): { k: number; t: number; d2: number } {
+		let best = Infinity, bestK = -1, bestT = 0;
+		for (let k = 0; k < this.seg.n; k++) {
+			segDist2(this.seg, k, px, py, this.tmp);
+			if (this.tmp.d2 < best) {
+				best = this.tmp.d2;
+				bestK = k;
+				bestT = this.tmp.t;
+			}
+		}
+		return { k: bestK, t: bestT, d2: best };
+	}
+
+	/**
+	 * Signed distance (m) to the coast, positive on the ocean side, and the arc
+	 * length along its polyline of the nearest point.
+	 */
+	nearest(px: number, py: number, brute = false): { s: number; arc: number } {
+		const { k, t, d2 } = brute ? this.searchBrute(px, py) : this.search(px, py);
+		const seg = this.seg;
+		const abx = seg.bx[k] - seg.ax[k], aby = seg.by[k] - seg.ay[k];
+		const cross = abx * (py - seg.ay[k]) - aby * (px - seg.ax[k]);
+		// ocean on the right: cross < 0 is seaward (the reference rule, cross = 0 is land)
+		const right = cross < 0 ? 1 : -1;
+		const sign = this.side === 1 ? right : cross > 0 ? 1 : -1;
+		return { s: Math.sqrt(d2) * sign, arc: seg.a0[k] + t * Math.hypot(abx, aby) };
+	}
 }
 
 /** Depth (m) at signed distance s for a recipe, with a local shelf width. */
@@ -182,11 +311,20 @@ export interface BathyOptions {
 	 * 5 x 5 block mean of Run A exactly.
 	 */
 	supersample?: number;
+	/**
+	 * Which side of the polyline's direction of travel the ocean is on.
+	 * 'right' (default) is the OpenStreetMap coastline convention; map-kit's
+	 * coastlineNear returns 'left' (OGC winding). See FRAME.md.
+	 */
+	oceanSide?: 'left' | 'right';
+	/** check every segment instead of using the index (for tests; same result, slower) */
+	bruteForce?: boolean;
 }
 
 /**
  * Build the depth grid for a coastline.
  * @param coast one polyline or several, ENU metres, ocean on the right
+ *   unless opts.oceanSide says otherwise
  */
 export function bathyFromPolyline(
 	coast: Polyline | Polyline[],
@@ -196,8 +334,9 @@ export function bathyFromPolyline(
 	opts: BathyOptions = {}
 ): Bathy {
 	const r: BathyRecipe = { ...recipe, ...overrides };
-	const seg = flatten(coast);
-	if (seg.n === 0) throw new Error('bathyFromPolyline: coast has no segments');
+	const index = new CoastIndex(coast, opts.oceanSide ?? 'right');
+	if (index.seg.n === 0) throw new Error('bathyFromPolyline: coast has no segments');
+	const brute = opts.bruteForce ?? false;
 	const { nx, ny } = grid;
 	const n = nx * ny;
 	const depth = new Float32Array(n);
@@ -208,7 +347,7 @@ export function bathyFromPolyline(
 	let pivot = r.reefPivot ?? 0;
 	if (tilt !== 0 && r.reefPivot === undefined) {
 		const c = cellCentre(grid, (nx - 1) / 2, (ny - 1) / 2);
-		pivot = nearest(seg, c[0], c[1]).arc;
+		pivot = index.nearest(c[0], c[1], brute).arc;
 	}
 
 	const rad = (grid.rotationDeg * Math.PI) / 180;
@@ -220,7 +359,7 @@ export function bathyFromPolyline(
 	const depthAt = (u: number, v: number) => {
 		const px = grid.origin[0] + u * cr - v * sr;
 		const py = grid.origin[1] + u * sr + v * cr;
-		const { s, arc } = nearest(seg, px, py);
+		const { s, arc } = index.nearest(px, py, brute);
 		let w = r.shelfWidth;
 		if (tilt !== 0) {
 			w = Math.min(5 * r.shelfWidth, Math.max(0.2 * r.shelfWidth, w + tilt * (arc - pivot)));

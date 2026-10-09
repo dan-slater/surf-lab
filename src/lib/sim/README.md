@@ -6,13 +6,16 @@ the reference run: [PARITY.md](PARITY.md).
 
 | file | what |
 |---|---|
-| `bathy.ts` | `bathyFromPolyline(coast, grid, recipe, overrides?, opts?)`: depth grid from an ENU coastline |
-| `swell.ts` | `Swell` (Hs, Tp, compass direction, spread), JONSWAP components, angle conversions |
-| `config.ts` | `SolverOptions`, Run C defaults, `suggestDt`, uniform packing |
-| `step.wgsl` | the time step: first-order HLL + Audusse, Manning, foam, wavemaker, sponges |
+| `bathy.ts` | `bathyFromPolyline(coast, grid, recipe, overrides?, opts?)`: depth grid from an ENU coastline; `CoastIndex`, the segment hierarchy behind it |
+| `grid.ts` | `gridFromCoast(polylines, opts)`: place a GridSpec on any coastline (FRAME.md) |
+| `swell.ts` | `Swell` (Hs, Tp, compass direction, spread), JONSWAP components, angle conversions, `generatorDirection` (forecast deep-water direction to wavemaker direction) |
+| `config.ts` | `SolverOptions`, defaults, `breakingDefaults`, `suggestDt`, uniform packing |
+| `common.wgsl` | uniforms, bindings and `finish`: friction, foam, breaking, wavemaker, sponges |
+| `muscl.wgsl` | scheme `'muscl'` (default): MUSCL-MC + Audusse + HLL, SSP-RK2 as two dispatches per step (Run A's core) |
+| `step.wgsl` | scheme `'first-order'`: Run C's single-stage HLL + Audusse |
 | `fields.wgsl` | post-step passes: pack the state into a texture, accumulate Hs and foam statistics |
 | `solver.ts` | `createSolver(device, options)`: the WebGPU module |
-| `cpu.ts` | `createCpuSolver(options)`: the same scheme on the CPU, for tests and parity |
+| `cpu.ts` | `createCpuSolver(options)`: both schemes on the CPU, for tests and parity |
 | `debug.wgsl`, `debug-render.ts` | a plain diagnostic painter (eta colour map, foam white, land brown) |
 | `gpu.ts` | `requestDevice()` with a retry for slow GPU-process start-up |
 
@@ -21,22 +24,24 @@ the reference run: [PARITY.md](PARITY.md).
 ```ts
 import { bathyFromPolyline, JBAY_RECIPE } from '#lib/sim/bathy.ts';
 import { createSolver } from '#lib/sim/solver.ts';
-import { createDebugRenderer, affineFromProjection } from '#lib/sim/debug-render.ts';
+import { createDebugRenderer } from '#lib/sim/debug-render.ts';
 import { requestDevice } from '#lib/sim/gpu.ts';
+import { jbayGrid } from '#lib/spots/jbay.ts';
 
-const grid = { nx: 192, ny: 512, dx: 12.5, origin: [-993.75, -2893.75], rotationDeg: 0 };
+const grid = jbayGrid(6.25); // 384 x 1024 cells
 const { depth } = bathyFromPolyline(coastEnu, grid, JBAY_RECIPE, { shelfWidth: 180 });
 const { device } = await requestDevice();
 const solver = createSolver(device, {
 	nx: grid.nx, ny: grid.ny, dx: grid.dx, depth,
 	swell: { Hs: 2.5, Tp: 15, dirDeg: 120, spread: 20 },
-	rotationDeg: grid.rotationDeg
+	rotationDeg: grid.rotationDeg,
+	wavemaker: { width: 75 / grid.dx }, // keep the band and sponges the same in metres
+	sponge: { width: 150 / grid.dx }
 });
-const painter = createDebugRenderer(device, canvas, solver);
-// in a map overlay: painter.setAffine(affineFromProjection(grid, enuToPixel, canvas.width, canvas.height))
+const painter = createDebugRenderer(solver, canvas);
 
 function frame() {
-	solver.step();      // options.substeps steps of options.dt
+	solver.step(); // options.substeps steps of params.dt
 	painter.draw();
 	requestAnimationFrame(frame);
 }
@@ -45,7 +50,7 @@ function frame() {
 The solver draws nothing itself. A renderer reads `solver.fields`, an
 `rgba16float` texture of width nx and height ny whose texel `(ix, iy)` holds
 `(eta, h, foam, zb)`, refreshed at the end of every `step()`. `solver.buffers`
-exposes the raw state for compute-side consumers.
+exposes the raw state for compute-side consumers, `solver.device` the device.
 
 `setSwell()` changes the forcing without a restart (the dial). `setDepth()`
 swaps the bathymetry and resets to still water (a new spot). `readEta()`,
@@ -53,21 +58,65 @@ swaps the bathymetry and resets to still water (a new spot). `readEta()`,
 `readStats()` give per-cell Hs and foam statistics, the basis for "is this spot
 working".
 
-The grid size, dx and dt are inputs. `suggestDt(maxDepth, dx)` gives a stable
-step; Run C's 0.12 s suits 12.5 m cells up to about 40 m deep.
+### Choosing dx, dt and the scheme
 
-## Map overlay contract (map-kit)
+| | J-Bay vs Run A | cells (6.4 x 2.4 km) | 4090, 600 s of model time |
+|---|---|---|---|
+| `muscl`, 6.25 m | interior Hs 91 %, all 8 sections break | 393 k | 0.44 s |
+| `muscl`, 12.5 m | interior Hs 79 %, 6 of 8 break | 98 k | 0.31 s |
+| `first-order`, 12.5 m | interior Hs 10 %, nothing breaks | 98 k | 0.30 s |
 
-map-kit's overlay supplies a canvas, `project`/`unproject` and
-`enuFrame(lat0, lon0)`. Convert the clicked coast to ENU with `enuFrame`, choose
-a `GridSpec` with land on the low-ix side (FRAME.md), build the depth, and give
-the painter an affine from `affineFromProjection(grid, (x, y) =>
-project(enuFrame.toLonLat(x, y)), w, h)`. The function name on map-kit's side
-is a guess until that package lands.
+6.25 m is the recommended default; 12.5 m is the fallback for weak GPUs. `dt`
+defaults to Courant 0.4 at the deepest cell (`suggestDt`), 0.126 s at 6.25 m on
+J-Bay. Watching in real time needs about 8 steps per second at that dt; the
+`/sim` page steps by elapsed time (`?speed=` model seconds per real second).
 
-## Known limit
+Breaking defaults (`breakingDefaults`) follow Run A, depth below 5 m and
+steepness above 0.40 or Froude above a grid-scaled threshold
+`0.65 - 0.024 dx` (0.50 at 6.25 m, 0.35 at 12.5 m).
 
-The scheme is first order, as Run C was. At 12.5 m it damps a 15 s swell with an
-e-folding distance of about 265 m, so on J-Bay's grid almost nothing reaches the
-surf zone and nothing breaks. PARITY.md has the numbers; HANDOVER.md has what
-MUSCL + RK2 would take.
+## Map overlay (map-kit)
+
+map-kit's `<Overlay mode="webgpu">` owns the device and the configured canvas
+context. Create the solver on that device and give the painter the context;
+neither is configured or destroyed here.
+
+```ts
+import { coastlineNear } from '@dan-slater/map-kit';
+import { createDebugRenderer, affineFromOverlay } from '#lib/sim/debug-render.ts';
+
+async function onready(frame: OverlayFrame) {
+	const device = frame.gpu!.device as GPUDevice;
+	const context = frame.gpu!.context as GPUCanvasContext;
+	const format = frame.gpu!.format as GPUTextureFormat;
+	const coast = await coastlineNear(frame.map, { lon, lat, radiusMeters: 4000, classes: ['ocean'] });
+	const lines = coast.polylines.map((p) => p.points);
+	grid = gridFromCoast(lines, { dx: 6.25, oceanSide: 'left' }).grid;
+	const { depth } = bathyFromPolyline(lines, grid, JBAY_RECIPE, {}, { oceanSide: 'left' });
+	// the forecast gives a deep-water direction; the wavemaker wants the local one
+	const dir = generatorDirection(forecast.dirDeg, grid, wavemakerDepth(depth, grid.nx, grid.ny, 12), { Tp: forecast.Tp });
+	const swell = { Hs: forecast.Hs, Tp: forecast.Tp, dirDeg: dir.dirDeg, spread: 20 };
+	solver = createSolver(device, { nx: grid.nx, ny: grid.ny, dx: grid.dx, depth, swell, rotationDeg: grid.rotationDeg });
+	painter = createDebugRenderer(solver, { context, format });
+}
+
+function ondraw(frame: OverlayFrame) { // with <Overlay continuous>
+	solver.step();
+	painter.setAffine(affineFromOverlay(grid, coast.frame, frame));
+	painter.draw();
+}
+```
+
+`affineFromOverlay` maps three grid corners through `toLonLat` and `project`
+and treats the map as affine across the domain. map-kit's own docs recommend
+this; it stops being exact under globe curvature, which is far below a pixel
+over a few kilometres at the zoom a spot is viewed at.
+
+`gridFromCoast` guarantees 1 km of water in front of the middle half of the
+domain; check `info.squeezed` and `info.minWater` for coasts that do not fit.
+
+## Known limits
+
+At 12.5 m the scheme still loses about 20 % of the swell height between the
+wavemaker and the surf zone, and breaking is depth-limited bores (NSWE has no
+dispersion; Run A has the same limit). See PARITY.md.
