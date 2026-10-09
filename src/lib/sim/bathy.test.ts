@@ -96,4 +96,43 @@ describe('bathyFromPolyline', () => {
 		const ix = 50; // x = 400, past the nominal shelf edge
 		expect(tilt.depth[ix * 50 + 49]).toBeGreaterThan(tilt.depth[ix * 50 + 0]);
 	});
+
+	// a map-kit style coast: thousands of short segments, water on the LEFT,
+	// split into two polylines at a river mouth
+	function wigglyCoast(n: number): [number, number][][] {
+		const pts: [number, number][] = [];
+		for (let i = 0; i < n; i++) {
+			const y = 3200 - (6400 * i) / (n - 1); // walking south: water (east) is on the left
+			pts.push([-200 + 150 * Math.sin(y / 400) + 20 * Math.sin(y / 23) + 5 * Math.sin(y / 3.1), y]);
+		}
+		const mouth = Math.floor(n * 0.6);
+		return [pts.slice(0, mouth), pts.slice(mouth + 3)];
+	}
+
+	test('the index returns exactly the brute-force answer on a 4000-vertex coast', () => {
+		const coast = wigglyCoast(4000);
+		const grid: GridSpec = { nx: 96, ny: 256, dx: 25, origin: [-1000, -3200], rotationDeg: 12 };
+		const t0 = performance.now();
+		const fast = bathyFromPolyline(coast, grid, JBAY_RECIPE, {}, { oceanSide: 'left' });
+		const t1 = performance.now();
+		const slow = bathyFromPolyline(coast, grid, JBAY_RECIPE, {}, { oceanSide: 'left', bruteForce: true });
+		const t2 = performance.now();
+		console.log(`4000-vertex coast, ${grid.nx * grid.ny} cells: index ${(t1 - t0).toFixed(0)} ms, brute force ${(t2 - t1).toFixed(0)} ms`);
+		expect(Array.from(fast.depth)).toEqual(Array.from(slow.depth));
+		expect(Array.from(fast.s)).toEqual(Array.from(slow.s));
+		// water is east of the coast
+		expect(fast.depth[(grid.nx - 1) * grid.ny + 100]).toBeGreaterThan(10);
+		expect(fast.depth[0 * grid.ny + 100]).toBeLessThan(0);
+	});
+
+	test("oceanSide 'left' on a reversed polyline gives the same depth as 'right'", () => {
+		const right = JBAY.coast;
+		const left = [...JBAY.coast].reverse();
+		const a = bathyFromPolyline(right, JBAY_GRID);
+		const b = bathyFromPolyline(left, JBAY_GRID, JBAY_RECIPE, {}, { oceanSide: 'left' });
+		let max = 0;
+		for (let i = 0; i < a.depth.length; i++) max = Math.max(max, Math.abs(a.depth[i] - b.depth[i]));
+		// identical except where reversing the order changes which of two equidistant segments wins
+		expect(max).toBeLessThan(1e-3);
+	});
 });

@@ -39,7 +39,15 @@
 			const speed = Number(q.get('speed') ?? 10);
 			let owed = 0;
 			let prev = performance.now();
-			const r = createDebugRenderer(device, canvas, solver);
+			let target: HTMLCanvasElement | { context: GPUCanvasContext; format: GPUTextureFormat } = canvas;
+			if (q.get('external')) {
+				// what map-kit's <Overlay mode="webgpu"> hands over in frame.gpu
+				const context = canvas.getContext('webgpu') as GPUCanvasContext;
+				const format = navigator.gpu.getPreferredCanvasFormat();
+				context.configure({ device, format, alphaMode: 'premultiplied' });
+				target = { context, format };
+			}
+			const r = createDebugRenderer(solver, target);
 			status = 'running';
 			let frames = 0;
 			let last = performance.now();
