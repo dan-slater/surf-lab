@@ -28,6 +28,14 @@ export const JBAY_GRID: GridSpec = {
 };
 
 /**
+ * The same 2.4 x 6.4 km domain at another cell size (dx must divide 2400 and
+ * 6400). jbayGrid(12.5) is JBAY_GRID; jbayGrid(2.5) is Run A's grid.
+ */
+export function jbayGrid(dx: number): GridSpec {
+	return { nx: Math.round(2400 / dx), ny: Math.round(6400 / dx), dx, origin: [-1000 + dx / 2, -2900 + dx / 2], rotationDeg: 0 };
+}
+
+/**
  * Run A forcing (out/A4-full/manifest.json): directional JONSWAP Hs 2.5 m,
  * Tp 15 s, gamma 3.3, cos^20 spread about theta0 = 150 deg (math frame, from
  * +x). In compass terms the swell arrives FROM 270 - 150 = 120 deg.

@@ -7,12 +7,13 @@ import { compassFromTheta, swellComponents, thetaFromCompass } from './swell';
 const calm = { Hs: 0, Tp: 15, dirDeg: 120, spread: 20 };
 
 describe('CPU twin of step.wgsl', () => {
-	test('lake at rest over rough bed with a dry island stays at rest', () => {
+	for (const scheme of ['muscl', 'first-order'] as const)
+	test(`${scheme}: lake at rest over rough bed with a dry island stays at rest`, () => {
 		const nx = 40, ny = 30;
 		const depth = new Float32Array(nx * ny);
 		for (let ix = 0; ix < nx; ix++)
 			for (let iy = 0; iy < ny; iy++) depth[ix * ny + iy] = 5 + 3 * Math.sin(ix * 0.7) * Math.cos(iy * 0.4) - (ix < 6 ? 12 : 0);
-		const s = createCpuSolver({ nx, ny, dx: 10, depth, swell: calm, dt: 0.2 });
+		const s = createCpuSolver({ nx, ny, dx: 10, depth, swell: calm, dt: 0.2, scheme });
 		s.step(200);
 		let maxEta = 0, maxQ = 0;
 		const eta = s.readEta();
@@ -24,11 +25,12 @@ describe('CPU twin of step.wgsl', () => {
 		expect(maxQ).toBeLessThan(1e-5);
 	});
 
-	test('wavemaker phase travels at sqrt(g d) over a flat bed', () => {
+	for (const scheme of ['muscl', 'first-order'] as const)
+	test(`${scheme}: wavemaker phase travels at sqrt(g d) over a flat bed`, () => {
 		const nx = 200, ny = 4, d = 10, dx = 5;
 		const depth = new Float32Array(nx * ny).fill(d);
 		const s = createCpuSolver({
-			nx, ny, dx, depth, dt: 0.1,
+			nx, ny, dx, depth, dt: 0.1, scheme,
 			swell: { Hs: 0.2, Tp: 20, dirDeg: 90, spread: 0, spectrum: 'mono' },
 			sponge: { width: 0 }
 		});
@@ -60,7 +62,7 @@ describe('CPU twin of step.wgsl', () => {
 		// diffusion ~ c dx / 2 gives an e-folding distance of ~265 m here.
 		const nx = 80, ny = 4, d = 25;
 		const depth = new Float32Array(nx * ny).fill(d);
-		const s = createCpuSolver({ nx, ny, dx: 12.5, depth, swell: { Hs: 0.5, Tp: 15, dirDeg: 90, spread: 0, spectrum: 'mono' }, sponge: { width: 0 } });
+		const s = createCpuSolver({ nx, ny, dx: 12.5, depth, scheme: 'first-order', swell: { Hs: 0.5, Tp: 15, dirDeg: 90, spread: 0, spectrum: 'mono' }, sponge: { width: 0 } });
 		const lo = new Float64Array(nx).fill(Infinity), hi = new Float64Array(nx).fill(-Infinity);
 		for (let k = 0; k < 3000; k++) {
 			s.step(1);
@@ -75,6 +77,24 @@ describe('CPU twin of step.wgsl', () => {
 		const ratio = H(nx - 7 - 40) / H(nx - 7); // 500 m inshore of the band
 		expect(ratio).toBeGreaterThan(0.1);
 		expect(ratio).toBeLessThan(0.25);
+	});
+
+	test('MUSCL carries a 15 s swell at dx 12.5 m: > 85 % of the height after 500 m', () => {
+		const nx = 80, ny = 4, d = 25;
+		const depth = new Float32Array(nx * ny).fill(d);
+		const s = createCpuSolver({ nx, ny, dx: 12.5, depth, swell: { Hs: 0.5, Tp: 15, dirDeg: 90, spread: 0, spectrum: 'mono' }, sponge: { width: 0 } });
+		const lo = new Float64Array(nx).fill(Infinity), hi = new Float64Array(nx).fill(-Infinity);
+		for (let k = 0; k < 3000; k++) {
+			s.step(1);
+			if (s.time > 200)
+				for (let ix = 0; ix < nx; ix++) {
+					const e = s.state[(ix * ny + 1) * 4] - d;
+					lo[ix] = Math.min(lo[ix], e);
+					hi[ix] = Math.max(hi[ix], e);
+				}
+		}
+		const ratio = (hi[nx - 47] - lo[nx - 47]) / (hi[nx - 7] - lo[nx - 7]);
+		expect(ratio).toBeGreaterThan(0.85);
 	});
 
 	test('compass and grid angles round-trip; Run A theta0 = 150 deg is from 120 deg', () => {
@@ -99,5 +119,5 @@ describe('CPU twin of step.wgsl', () => {
 		for (let i = 0; i < f.length; i++) if (f[i] > 0.5) foamCells++;
 		expect(finite).toBe(true);
 		expect(foamCells).toBeGreaterThan(0);
-	}, 60000);
+	}, 120000);
 });
