@@ -1,5 +1,55 @@
 # surf-lab — HANDOVER
 
+> ## BOOK LINE (build-order step 5), 2026-10-09: book done, main merged in, the 2-D instrument breaks on the MUSCL solver
+>
+> **Built (branch `book`, worktree `~/code/surf-lab-book`):** `/book` (contents, nine ledes) and
+> `/book/[chapter]`: text left, the section's instrument pinned right and swapped on scroll
+> (IntersectionObserver on section headings), a picker to override and "follow" to resume, a swell
+> strip (Hs, Tp, deep-water direction) driving every instrument; under 1100 px each section's
+> instrument sits inline, mounted lazily. Every chapter field renders; `[n]` links to references,
+> `#slug` to chapter routes. `/book/instruments` shows all 21. `scripts/sync-content.mjs` copies
+> `$SURF_BOOK_DIR` into git-ignored `content/chapters/` (`predev`, `prebuild`), failing loudly if
+> missing. KaTeX renders at build time on the raw strings (`src/routes/book/math.ts`; bare `<` in
+> two chapters' maths rules out client auto-render). Instruments: P1 to P6 lifted with maths and
+> drawing unchanged, fifteen derived from their chapters' equations (`src/lib/instruments/README.md`),
+> all reflowing down to 360 px. State hook: `HOOK(app state)` in `src/routes/book/[chapter]/+page.svelte`.
+>
+> **Since the last block:**
+> - `git merge main` into `book` (`48d3431`): one conflict, HANDOVER.md only (kept this block,
+>   took main's SIM LINE block). No conflicts in code.
+> - `Sim2D` now runs as the sim line's `/sim` does: MUSCL-MC + SSP-RK2 at 6.25 m (384 × 1024), 75 m
+>   wavemaker band, 150 m sponges, 300 s warm-up, 6 model seconds per wall second (capped per
+>   frame). It takes the deep-water `dirDeg` and converts with the sim line's
+>   `generatorDirection(dirDeg, grid, wavemakerDepth(...), { Tp })`; the stand-in `direction.ts` is
+>   gone. Readout: "deep water from 225° → 129° at the wavemaker (from behind the coast: wraps the
+>   headland)".
+> - **What it shows (headless, 4090):** the swell reaches the coast at full height with crests
+>   oblique to the shore, and J-Bay breaks: white foam in a narrow band on the inner edge of the
+>   shelf, in patches a few cells (tens of metres) long that move between frames as crests arrive,
+>   most of it from Boneyards past the Point. Near-white pixels are 0.16 to 0.23 % of the canvas
+>   (land included) across t = 312 to 494 s. The caption says this, plus "modelled from the
+>   coastline" and "breaking rule fitted to one reference run". The no-WebGPU fallback is now a
+>   MUSCL frame (`src/lib/instruments/assets/sim-jbay-muscl.png`).
+> - The sim line's `scripts/browser.ts` `warmGpu` breaks now that `/` navigates client-side; my
+>   screenshot script warms on `/book` itself.
+>
+> **Works, with evidence:** `bun run check` 0 errors 0 warnings (411 files); `bun test` 47 pass
+> (31 sim, 16 book); `bun run build` prerenders `/book`, nine chapters and `/book/instruments`: 213
+> KaTeX blocks, 0 errors. `bun scripts/shoot-instruments.ts`: all 21 instruments reshot at desktop,
+> 360 and 390 px (`docs/img/instruments/`), no horizontal overflow at either phone width; the
+> bench on `/book/breaking` swaps P1 → P3 → P2 → Iribarren → P4 on scroll. Console noise: only
+> `/favicon.ico` 404. Dev server: tmux `surflab-book`, `http://127.0.0.1:5183/book`.
+>
+> **Open questions:** (1) the MUSCL solver at 6.25 m is heavy for weak GPUs; the instrument caps
+> steps per frame so it falls behind rather than stalls, but it is untested off the 4090. (2) The
+> foam band is a few cells wide at this scale; whether that matches a real J-Bay surf zone is the
+> sim line's calibration question. (3) `scripts/browser.ts` `warmGpu` (sim line's) should warm on a
+> page that does not navigate.
+>
+> **Next for this line:** bind the state hook when `#lib/state` lands; draw the chapters' figure
+> briefs as static SVG; per-section peel angles in `SectionSpeed` once the sim's breaking fronts
+> can measure them (main has "Track breaking fronts for surfers").
+
 > ## APP LINE (build-order step 3), 2026-10-09: cover, dial, globe, forecast, spin-up BUILT; click-a-coast proven headless
 >
 > **Built (branch `app`, worktree `~/code/surf-lab-app`, main merged in at `a512b1f`):**

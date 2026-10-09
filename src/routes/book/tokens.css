@@ -1,0 +1,50 @@
+/*
+ * Book design tokens. Instruments read the colour and --mono tokens from CSS
+ * (src/lib/instruments/palette.ts), so restyling happens here. Palette: ink
+ * navy, teal, coral. Type: Libertinus Serif for prose, Spline Sans Mono for
+ * instrument labels; maths is KaTeX's own fonts.
+ */
+.book {
+	--ink: #071019;
+	--ink-2: #0a1a26;
+	--panel: #0c1e2c;
+	--land: #0f2430;
+	--coast: #aad2d2;
+	--line: rgba(122, 197, 200, 0.16);
+	--line-strong: rgba(122, 197, 200, 0.4);
+	--text: #e9f0ec;
+	--muted: #93aab0;
+	--teal: #7ac5c8;
+	--teal-hi: #b5e5e2;
+	--foam: #f2efe6;
+	--coral: #ff8a5c;
+	--gold: #ffb454;
+	--good: #8ed99a;
+	--serif: 'Libertinus Serif', 'Libertinus Serif Display', Georgia, serif;
+	--mono: 'Spline Sans Mono', ui-monospace, monospace;
+
+	background: var(--ink);
+	color: var(--text);
+	font-family: var(--serif);
+	font-size: 1.19rem;
+	line-height: 1.6;
+	min-height: 100vh;
+}
+.book ::selection {
+	background: var(--coral);
+	color: var(--ink);
+}
+.book a {
+	color: var(--teal);
+}
+.book a:hover {
+	color: var(--teal-hi);
+}
+.book .katex {
+	font-size: 1.04em;
+}
+.book .katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.2em 0;
+}
