@@ -1,43 +1,41 @@
 # surf-lab — HANDOVER
 
-> ## SIM LINE, 2026-10-09: step 2 accepted; grid-from-coast, swell-direction conversion and the CPU parity run DONE
+> ## SIM LINE, 2026-10-09: build-order step 4 (product renderer + surfer rig) DONE on `main`
 >
-> **New since step 2 was accepted (on `main`):**
-> - `src/lib/sim/grid.ts`, `gridFromCoast(polylines, { dx, nx, ny, oceanSide, center, rotationDeg? })`:
->   returns `{ grid, toEnu, fromEnu, info }`. Shore along iy, land at low ix. Rotation starts from the
->   centre-weighted principal axis, then turns so the wavemaker line runs parallel to the depth
->   contours in front of the spot (it minimises the spread of coast distance along it over the core,
->   the middle half along shore). The coast sits at 35 % of the width, with at least 1 km of water and
->   150 m of land over the core; if both cannot hold, water wins and `info.squeezed` is set.
->   `rotationDeg` pins a hand-chosen frame (catalogue spots).
-> - `swell.ts`, `generatorDirection(deepWaterDeg, grid, depthAtWavemaker, { Tp, maxObliquityDeg })`:
->   Snell refraction from the forecast's deep-water direction to the wavemaker. Swell from behind the
->   coast (90 deg or more off the shore normal) is treated as grazing, after wrapping round a headland.
->   The result is capped at 45 deg. `Swell.dirDeg` is documented as the wavemaker (local) direction.
-> - CPU-twin parity at 6.25 m: 803 s wall; statistics equal to the GPU run's (Hs RMS difference 0.1 mm).
-> - FRAME.md documents both helpers; README.md has the overlay snippet using them.
+> **Built, one commit and captured frame each (`docs/img/render/`):** `src/lib/sim/render/`:
+> 1. `createRenderer(solver, { context, format, affine, theme, pixelRatio, look })` (`07a4886`): one
+>    full-screen WGSL pass over the solver's `fields` and a new `flow` texture. B-spline eta, face lighting
+>    from the slope, crest lines from a ridge fit, chart depth contours, land with topo lines, a wet-sand
+>    band and a coast stroke. Theme tokens are the book palette and the approved wave-landing look (ink navy,
+>    teal, cream foam, coral boards).
+> 2. Line-art foam (same commit): three iso-lines of the foam scalar plus fine streaks carried by the flow.
+> 3. `createFrontTracker(solver, grid).fronts()` (`70956e3`): a per-row GPU pass, 32 bytes/row of readback
+>    every 0.25 model s; sections, tracked ends, least-squares speed, P4 `vp = c/sin(alpha)`, makeable.
+> 4. `createSurfers({ zones, depth, grid, count, seed })` + `rig.ts` (`a519ab8`): the P6 rig and a seeded
+>    lineup -> take-off -> ride -> kick-out/wipe-out -> paddle cycle; `/sim/cover?rig=1` shows every pose.
+> 5. `Swell.groupiness/groupWaves` and `solver.rampFrom(level, { seconds, clock })` (`bc5bb6e`).
+> 6. `solver.budget(ms)` with `Governor` (`1f6c6f1`): slow motion first, then `coarser-grid`.
 >
-> **Evidence:** `bun run check` 0 errors, `bun run build` ok, `bun test` 28 pass (16 before, plus 8
-> grid, 4 swell).
+> **Evidence:** check 0 errors, build ok, `bun test` 37 pass (new: fronts 3, budget 4, sets/ramp 2). GPU and
+> CPU twin still agree (1.8e-4 m after 200 steps). On the 4090: 60 fps at 1440x860 and 2560x1440, a 6.25 m step
+> 0.083 ms, render + tracker 0.27 to 0.34 ms a frame, a 10x cover frame ~0.45 ms of GPU. Budgets of 0.6 and
+> 0.25 ms drop to slow motion, then ask for a coarser grid. Surfers over 400 model s: 19 rides, median 3.4 s
+> and 40 m, ending in kick-outs, wipe-outs and waves finishing.
 >
-> **Two acceptance targets not met as worded, on purpose (review):**
-> 1. "Reproduce the J-Bay frame to within a cell": the helper gives rotation 1.4 deg, centre 23 m off,
->    farthest corner 106 m off (6.25 m cells). With `rotationDeg: 0` pinned, every corner is within
->    27 m (4 cells at 6.25 m, 2 at 12.5 m). Run A's frame was drawn ENU-aligned by convention, and
->    J-Bay's shore turns through ~30 deg over 6 km, so any rule's rotation depends on how much coast
->    it weighs (0.98 deg at sigma 1 km, -6.9 deg at 1.6 km on the principal axis alone). I did not
->    tune constants to hit 0. Tests assert < 2 deg and < 30 m.
-> 2. "J-Bay 225 deg must land near 120 deg": it lands at **129 deg** (Tp 15 s; 139 at 12 s, 123 at
->    18 s). 225 deg is 135 deg off J-Bay's shore normal, from behind the coast, so plain Snell has no
->    answer; the grazing rule gives the largest angle the depth allows, asin(c/c0). Run A's 120 deg
->    is 30 deg off the normal, a hand choice; `maxObliquityDeg: 30` reproduces it. Tests assert
->    within 10 deg.
+> **Honest limits (review):** (1) the sim breaks 10 to 30 m from the shore, so at a 4 km framing the surf
+> zone is a thin bright band; the line art reads from ~2 km across and closer (frames 02-close, 06).
+> (2) Peels are short bursts, so rides are short; at 10x a ride is on screen for well under a second, so a
+> surfer-featuring cover wants 3x to 4x. (3) Budget timings without timestamp queries are upper bounds
+> (round-trip latency); a frame-interval cap backs them up; untested on a real weak GPU. (4) Front
+> thresholds and surfer tuning were fitted on J-Bay only.
 >
-> **Still standing from step 2:** 6.25 m default, Froude rule fitted to one run, the Mac fps check of
-> `/sim?warm=300` pending. Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim?warm=300`.
+> **For the app line:** the cover recipe is in `src/lib/sim/README.md` ("The product renderer"): a WebGPU
+> canvas (or map-kit's overlay context) for `createRenderer`, a 2d canvas above it for `crowd.draw`,
+> `budget.frame(...)` per rAF, `rampFrom(0)` on a new spot, `coarserDx` on `coarser-grid`. Dev route
+> `/sim/cover`; tmux `surflab-dev` on 127.0.0.1:5181.
 >
-> **Next for this line, if wanted:** per-spot calibration fields in the catalogue (pinned rotation,
-> breaking threshold, max obliquity); a `/sim?lon=&lat=` dev path once map-kit can be consumed.
+> **Next, if wanted:** timestamp-query timing when the device has it; surfers that pick lineups from where
+> fronts are born (for click-any-coast spots without named sections); a cover framing preset per spot.
 
 > ## 🌊 SURF-LAB + MAP-KIT: design settled, build via factory lines on zulzi (2026-10-08) — READ THIS FIRST
 >
