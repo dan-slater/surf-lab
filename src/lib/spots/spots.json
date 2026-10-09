@@ -6,11 +6,29 @@
 		"region": "Eastern Cape",
 		"lat": -34.0308,
 		"lon": 24.9338,
-		"wave": { "type": "point", "direction": "right", "bottom": "sand over rock" },
-		"swellWindow": { "fromDeg": 180, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2.5, "Tp": 15, "dirDeg": 225 },
+		"wave": {
+			"type": "point",
+			"direction": "right",
+			"bottom": "sand over rock"
+		},
+		"swellWindow": {
+			"fromDeg": 180,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2.5,
+			"Tp": 15,
+			"dirDeg": 225
+		},
 		"recipe": {},
-		"frame": { "rotationDeg": 0, "maxObliquityDeg": 30, "origin": [-1000, -2900] },
+		"frame": {
+			"rotationDeg": 0,
+			"maxObliquityDeg": 30,
+			"origin": [
+				-1000,
+				-2900
+			]
+		},
 		"coastSource": "jbay"
 	},
 	{
@@ -20,11 +38,36 @@
 		"region": "North Shore, Oahu, Hawaii",
 		"lat": 21.665,
 		"lon": -158.0539,
-		"wave": { "type": "reef", "direction": "left", "bottom": "lava reef" },
-		"swellWindow": { "fromDeg": 280, "toDeg": 20 },
-		"defaultSwell": { "Hs": 3, "Tp": 15, "dirDeg": 315 },
-		"recipe": { "shelfSlope": 0.08, "shelfWidth": 120, "rampSlope": 0.03 },
-		"sections": [{ "name": "Pipeline" }, { "name": "Backdoor" }, { "name": "Off The Wall" }]
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "lava reef"
+		},
+		"swellWindow": {
+			"fromDeg": 280,
+			"toDeg": 20
+		},
+		"defaultSwell": {
+			"Hs": 3,
+			"Tp": 15,
+			"dirDeg": 315
+		},
+		"recipe": {
+			"shelfSlope": 0.08,
+			"shelfWidth": 120,
+			"rampSlope": 0.03
+		},
+		"sections": [
+			{
+				"name": "Pipeline"
+			},
+			{
+				"name": "Backdoor"
+			},
+			{
+				"name": "Off The Wall"
+			}
+		]
 	},
 	{
 		"slug": "teahupoo",
@@ -33,10 +76,25 @@
 		"region": "Tahiti Iti",
 		"lat": -17.847,
 		"lon": -149.267,
-		"wave": { "type": "reef", "direction": "left", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 180, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2.5, "Tp": 16, "dirDeg": 210 },
-		"recipe": { "shelfSlope": 0.12, "shelfWidth": 100, "rampSlope": 0.08 }
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 180,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2.5,
+			"Tp": 16,
+			"dirDeg": 210
+		},
+		"recipe": {
+			"shelfSlope": 0.12,
+			"shelfWidth": 100,
+			"rampSlope": 0.08
+		}
 	},
 	{
 		"slug": "mundaka",
@@ -45,10 +103,28 @@
 		"region": "Basque Country",
 		"lat": 43.4073,
 		"lon": -2.6963,
-		"wave": { "type": "river mouth", "direction": "left", "bottom": "sandbar" },
-		"swellWindow": { "fromDeg": 290, "toDeg": 350 },
-		"defaultSwell": { "Hs": 2, "Tp": 13, "dirDeg": 315 },
-		"recipe": { "shelfSlope": 0.03, "sandbar": { "offset": 150, "height": 1.5, "width": 50 } }
+		"wave": {
+			"type": "river mouth",
+			"direction": "left",
+			"bottom": "sandbar"
+		},
+		"swellWindow": {
+			"fromDeg": 290,
+			"toDeg": 350
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 13,
+			"dirDeg": 315
+		},
+		"recipe": {
+			"shelfSlope": 0.03,
+			"sandbar": {
+				"offset": 150,
+				"height": 1.5,
+				"width": 50
+			}
+		}
 	},
 	{
 		"slug": "bells-beach",
@@ -57,11 +133,35 @@
 		"region": "Victoria",
 		"lat": -38.3686,
 		"lon": 144.2811,
-		"wave": { "type": "reef", "direction": "right", "bottom": "rock reef" },
-		"swellWindow": { "fromDeg": 190, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2, "Tp": 14, "dirDeg": 225 },
-		"recipe": { "shelfSlope": 0.05, "shelfWidth": 200 },
-		"sections": [{ "name": "Rincon" }, { "name": "The Bowl" }, { "name": "Winkipop" }]
+		"wave": {
+			"type": "reef",
+			"direction": "right",
+			"bottom": "rock reef"
+		},
+		"swellWindow": {
+			"fromDeg": 190,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 14,
+			"dirDeg": 225
+		},
+		"recipe": {
+			"shelfSlope": 0.05,
+			"shelfWidth": 200
+		},
+		"sections": [
+			{
+				"name": "Rincon"
+			},
+			{
+				"name": "The Bowl"
+			},
+			{
+				"name": "Winkipop"
+			}
+		]
 	},
 	{
 		"slug": "nazare",
@@ -70,10 +170,25 @@
 		"region": "Praia do Norte",
 		"lat": 39.606,
 		"lon": -9.085,
-		"wave": { "type": "beach", "direction": "both", "bottom": "sand, submarine canyon" },
-		"swellWindow": { "fromDeg": 250, "toDeg": 330 },
-		"defaultSwell": { "Hs": 4, "Tp": 16, "dirDeg": 290 },
-		"recipe": { "shelfSlope": 0.05, "shelfWidth": 150, "rampSlope": 0.05 }
+		"wave": {
+			"type": "beach",
+			"direction": "both",
+			"bottom": "sand, submarine canyon"
+		},
+		"swellWindow": {
+			"fromDeg": 250,
+			"toDeg": 330
+		},
+		"defaultSwell": {
+			"Hs": 4,
+			"Tp": 16,
+			"dirDeg": 290
+		},
+		"recipe": {
+			"shelfSlope": 0.05,
+			"shelfWidth": 150,
+			"rampSlope": 0.05
+		}
 	},
 	{
 		"slug": "snapper-rocks",
@@ -82,11 +197,38 @@
 		"region": "Gold Coast, Queensland",
 		"lat": -28.1626,
 		"lon": 153.5497,
-		"wave": { "type": "point", "direction": "right", "bottom": "sand" },
-		"swellWindow": { "fromDeg": 60, "toDeg": 160 },
-		"defaultSwell": { "Hs": 1.8, "Tp": 12, "dirDeg": 120 },
-		"recipe": { "shelfSlope": 0.03, "shelfWidth": 300 },
-		"sections": [{ "name": "Snapper Rocks" }, { "name": "Rainbow Bay" }, { "name": "Greenmount" }, { "name": "Coolangatta" }]
+		"wave": {
+			"type": "point",
+			"direction": "right",
+			"bottom": "sand"
+		},
+		"swellWindow": {
+			"fromDeg": 60,
+			"toDeg": 160
+		},
+		"defaultSwell": {
+			"Hs": 1.8,
+			"Tp": 12,
+			"dirDeg": 120
+		},
+		"recipe": {
+			"shelfSlope": 0.03,
+			"shelfWidth": 300
+		},
+		"sections": [
+			{
+				"name": "Snapper Rocks"
+			},
+			{
+				"name": "Rainbow Bay"
+			},
+			{
+				"name": "Greenmount"
+			},
+			{
+				"name": "Coolangatta"
+			}
+		]
 	},
 	{
 		"slug": "uluwatu",
@@ -95,11 +237,39 @@
 		"region": "Bukit Peninsula, Bali",
 		"lat": -8.815,
 		"lon": 115.087,
-		"wave": { "type": "reef", "direction": "left", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 180, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2, "Tp": 15, "dirDeg": 215 },
-		"recipe": { "shelfSlope": 0.05, "shelfWidth": 250, "reefAngleDeg": 10 },
-		"sections": [{ "name": "Temples" }, { "name": "The Peak" }, { "name": "Racetrack" }, { "name": "Outside Corner" }]
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 180,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 15,
+			"dirDeg": 215
+		},
+		"recipe": {
+			"shelfSlope": 0.05,
+			"shelfWidth": 250,
+			"reefAngleDeg": 10
+		},
+		"sections": [
+			{
+				"name": "Temples"
+			},
+			{
+				"name": "The Peak"
+			},
+			{
+				"name": "Racetrack"
+			},
+			{
+				"name": "Outside Corner"
+			}
+		]
 	},
 	{
 		"slug": "cloudbreak",
@@ -108,10 +278,26 @@
 		"region": "Mamanuca Islands",
 		"lat": -17.8833,
 		"lon": 177.1857,
-		"wave": { "type": "reef", "direction": "left", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 170, "toDeg": 240 },
-		"defaultSwell": { "Hs": 2.5, "Tp": 15, "dirDeg": 205 },
-		"recipe": { "shelfSlope": 0.08, "shelfWidth": 150, "rampSlope": 0.05 }
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 170,
+			"toDeg": 240
+		},
+		"defaultSwell": {
+			"Hs": 2.5,
+			"Tp": 15,
+			"dirDeg": 205
+		},
+		"recipe": {
+			"shelfSlope": 0.08,
+			"shelfWidth": 150,
+			"rampSlope": 0.05
+		},
+		"modelNote": "An offshore reef about 3 km from the nearest land (Tavarua). The coastline model cannot represent it, so there is no bundled sim."
 	},
 	{
 		"slug": "trestles",
@@ -120,11 +306,37 @@
 		"region": "San Clemente, California",
 		"lat": 33.3825,
 		"lon": -117.5889,
-		"wave": { "type": "cobblestone point", "direction": "both", "bottom": "cobblestone" },
-		"swellWindow": { "fromDeg": 180, "toDeg": 290 },
-		"defaultSwell": { "Hs": 1.5, "Tp": 14, "dirDeg": 200 },
-		"recipe": { "shelfSlope": 0.035 },
-		"sections": [{ "name": "Uppers" }, { "name": "Lowers" }, { "name": "Middles" }, { "name": "Church" }]
+		"wave": {
+			"type": "cobblestone point",
+			"direction": "both",
+			"bottom": "cobblestone"
+		},
+		"swellWindow": {
+			"fromDeg": 180,
+			"toDeg": 290
+		},
+		"defaultSwell": {
+			"Hs": 1.5,
+			"Tp": 14,
+			"dirDeg": 200
+		},
+		"recipe": {
+			"shelfSlope": 0.035
+		},
+		"sections": [
+			{
+				"name": "Uppers"
+			},
+			{
+				"name": "Lowers"
+			},
+			{
+				"name": "Middles"
+			},
+			{
+				"name": "Church"
+			}
+		]
 	},
 	{
 		"slug": "hossegor",
@@ -133,11 +345,39 @@
 		"region": "Landes",
 		"lat": 43.6727,
 		"lon": -1.4433,
-		"wave": { "type": "beach", "direction": "both", "bottom": "sandbar" },
-		"swellWindow": { "fromDeg": 250, "toDeg": 330 },
-		"defaultSwell": { "Hs": 2, "Tp": 13, "dirDeg": 295 },
-		"recipe": { "shelfSlope": 0.03, "sandbar": { "offset": 120, "height": 1.5, "width": 40 } },
-		"sections": [{ "name": "La Gravière" }, { "name": "La Nord" }, { "name": "Les Culs Nuls" }]
+		"wave": {
+			"type": "beach",
+			"direction": "both",
+			"bottom": "sandbar"
+		},
+		"swellWindow": {
+			"fromDeg": 250,
+			"toDeg": 330
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 13,
+			"dirDeg": 295
+		},
+		"recipe": {
+			"shelfSlope": 0.03,
+			"sandbar": {
+				"offset": 120,
+				"height": 1.5,
+				"width": 40
+			}
+		},
+		"sections": [
+			{
+				"name": "La Gravière"
+			},
+			{
+				"name": "La Nord"
+			},
+			{
+				"name": "Les Culs Nuls"
+			}
+		]
 	},
 	{
 		"slug": "raglan",
@@ -146,11 +386,35 @@
 		"region": "Waikato",
 		"lat": -37.82,
 		"lon": 174.813,
-		"wave": { "type": "point", "direction": "left", "bottom": "rock and sand" },
-		"swellWindow": { "fromDeg": 200, "toDeg": 280 },
-		"defaultSwell": { "Hs": 2, "Tp": 14, "dirDeg": 240 },
-		"recipe": { "shelfSlope": 0.04, "shelfWidth": 250 },
-		"sections": [{ "name": "Indicators" }, { "name": "Whale Bay" }, { "name": "Manu Bay" }]
+		"wave": {
+			"type": "point",
+			"direction": "left",
+			"bottom": "rock and sand"
+		},
+		"swellWindow": {
+			"fromDeg": 200,
+			"toDeg": 280
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 14,
+			"dirDeg": 240
+		},
+		"recipe": {
+			"shelfSlope": 0.04,
+			"shelfWidth": 250
+		},
+		"sections": [
+			{
+				"name": "Indicators"
+			},
+			{
+				"name": "Whale Bay"
+			},
+			{
+				"name": "Manu Bay"
+			}
+		]
 	},
 	{
 		"slug": "skeleton-bay",
@@ -159,10 +423,26 @@
 		"region": "Walvis Bay",
 		"lat": -22.96,
 		"lon": 14.42,
-		"wave": { "type": "sand point", "direction": "left", "bottom": "sand" },
-		"swellWindow": { "fromDeg": 190, "toDeg": 240 },
-		"defaultSwell": { "Hs": 2.5, "Tp": 15, "dirDeg": 215 },
-		"recipe": { "shelfSlope": 0.025, "shelfWidth": 300, "rampSlope": 0.01 }
+		"wave": {
+			"type": "sand point",
+			"direction": "left",
+			"bottom": "sand"
+		},
+		"swellWindow": {
+			"fromDeg": 190,
+			"toDeg": 240
+		},
+		"defaultSwell": {
+			"Hs": 2.5,
+			"Tp": 15,
+			"dirDeg": 215
+		},
+		"recipe": {
+			"shelfSlope": 0.025,
+			"shelfWidth": 300,
+			"rampSlope": 0.01
+		},
+		"modelNote": "Catalogue position not yet confirmed: it falls 1.3 km inland of the tile coastline, so there is no bundled sim."
 	},
 	{
 		"slug": "supertubos",
@@ -171,10 +451,28 @@
 		"region": "Peniche",
 		"lat": 39.3436,
 		"lon": -9.3636,
-		"wave": { "type": "beach", "direction": "both", "bottom": "sandbar" },
-		"swellWindow": { "fromDeg": 200, "toDeg": 300 },
-		"defaultSwell": { "Hs": 2, "Tp": 13, "dirDeg": 260 },
-		"recipe": { "shelfSlope": 0.04, "sandbar": { "offset": 100, "height": 1.2, "width": 35 } }
+		"wave": {
+			"type": "beach",
+			"direction": "both",
+			"bottom": "sandbar"
+		},
+		"swellWindow": {
+			"fromDeg": 200,
+			"toDeg": 300
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 13,
+			"dirDeg": 260
+		},
+		"recipe": {
+			"shelfSlope": 0.04,
+			"sandbar": {
+				"offset": 100,
+				"height": 1.2,
+				"width": 35
+			}
+		}
 	},
 	{
 		"slug": "mavericks",
@@ -183,10 +481,25 @@
 		"region": "Half Moon Bay, California",
 		"lat": 37.4925,
 		"lon": -122.5009,
-		"wave": { "type": "reef", "direction": "right", "bottom": "rock reef" },
-		"swellWindow": { "fromDeg": 260, "toDeg": 320 },
-		"defaultSwell": { "Hs": 5, "Tp": 17, "dirDeg": 295 },
-		"recipe": { "shelfSlope": 0.03, "shelfWidth": 400, "rampSlope": 0.025 }
+		"wave": {
+			"type": "reef",
+			"direction": "right",
+			"bottom": "rock reef"
+		},
+		"swellWindow": {
+			"fromDeg": 260,
+			"toDeg": 320
+		},
+		"defaultSwell": {
+			"Hs": 5,
+			"Tp": 17,
+			"dirDeg": 295
+		},
+		"recipe": {
+			"shelfSlope": 0.03,
+			"shelfWidth": 400,
+			"rampSlope": 0.025
+		}
 	},
 	{
 		"slug": "padang-padang",
@@ -195,10 +508,24 @@
 		"region": "Bukit Peninsula, Bali",
 		"lat": -8.8113,
 		"lon": 115.1018,
-		"wave": { "type": "reef", "direction": "left", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 190, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2.5, "Tp": 16, "dirDeg": 220 },
-		"recipe": { "shelfSlope": 0.08, "shelfWidth": 120 }
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 190,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2.5,
+			"Tp": 16,
+			"dirDeg": 220
+		},
+		"recipe": {
+			"shelfSlope": 0.08,
+			"shelfWidth": 120
+		}
 	},
 	{
 		"slug": "punta-de-lobos",
@@ -207,10 +534,25 @@
 		"region": "Pichilemu",
 		"lat": -34.4285,
 		"lon": -72.0447,
-		"wave": { "type": "point", "direction": "left", "bottom": "rock" },
-		"swellWindow": { "fromDeg": 200, "toDeg": 270 },
-		"defaultSwell": { "Hs": 3, "Tp": 15, "dirDeg": 230 },
-		"recipe": { "shelfSlope": 0.04, "shelfWidth": 250, "rampSlope": 0.02 }
+		"wave": {
+			"type": "point",
+			"direction": "left",
+			"bottom": "rock"
+		},
+		"swellWindow": {
+			"fromDeg": 200,
+			"toDeg": 270
+		},
+		"defaultSwell": {
+			"Hs": 3,
+			"Tp": 15,
+			"dirDeg": 230
+		},
+		"recipe": {
+			"shelfSlope": 0.04,
+			"shelfWidth": 250,
+			"rampSlope": 0.02
+		}
 	},
 	{
 		"slug": "pasta-point",
@@ -219,10 +561,24 @@
 		"region": "North Malé Atoll",
 		"lat": 4.3225,
 		"lon": 73.595,
-		"wave": { "type": "reef", "direction": "left", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 130, "toDeg": 220 },
-		"defaultSwell": { "Hs": 1.5, "Tp": 14, "dirDeg": 180 },
-		"recipe": { "shelfSlope": 0.06, "shelfWidth": 150 }
+		"wave": {
+			"type": "reef",
+			"direction": "left",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 130,
+			"toDeg": 220
+		},
+		"defaultSwell": {
+			"Hs": 1.5,
+			"Tp": 14,
+			"dirDeg": 180
+		},
+		"recipe": {
+			"shelfSlope": 0.06,
+			"shelfWidth": 150
+		}
 	},
 	{
 		"slug": "lances-right",
@@ -231,10 +587,25 @@
 		"region": "Sipura, Mentawai Islands",
 		"lat": -2.1736,
 		"lon": 99.62,
-		"wave": { "type": "reef", "direction": "right", "bottom": "coral reef" },
-		"swellWindow": { "fromDeg": 180, "toDeg": 250 },
-		"defaultSwell": { "Hs": 2, "Tp": 15, "dirDeg": 215 },
-		"recipe": { "shelfSlope": 0.08, "shelfWidth": 120 }
+		"wave": {
+			"type": "reef",
+			"direction": "right",
+			"bottom": "coral reef"
+		},
+		"swellWindow": {
+			"fromDeg": 180,
+			"toDeg": 250
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 15,
+			"dirDeg": 215
+		},
+		"recipe": {
+			"shelfSlope": 0.08,
+			"shelfWidth": 120
+		},
+		"modelNote": "Catalogue position not yet confirmed: no ocean coastline within 3.5 km, so there is no bundled sim."
 	},
 	{
 		"slug": "kirra",
@@ -243,9 +614,23 @@
 		"region": "Gold Coast, Queensland",
 		"lat": -28.1675,
 		"lon": 153.5245,
-		"wave": { "type": "point", "direction": "right", "bottom": "sand" },
-		"swellWindow": { "fromDeg": 60, "toDeg": 160 },
-		"defaultSwell": { "Hs": 2, "Tp": 12, "dirDeg": 120 },
-		"recipe": { "shelfSlope": 0.03, "shelfWidth": 300 }
+		"wave": {
+			"type": "point",
+			"direction": "right",
+			"bottom": "sand"
+		},
+		"swellWindow": {
+			"fromDeg": 60,
+			"toDeg": 160
+		},
+		"defaultSwell": {
+			"Hs": 2,
+			"Tp": 12,
+			"dirDeg": 120
+		},
+		"recipe": {
+			"shelfSlope": 0.03,
+			"shelfWidth": 300
+		}
 	}
 ]

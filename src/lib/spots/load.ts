@@ -8,7 +8,7 @@ export type SceneResult = { scene: SimScene; error?: undefined } | { scene: null
 export async function loadScene(spot: Spot, dx: number): Promise<SceneResult> {
 	const coast = await loadCoast(spot);
 	if (!coast || coast.polylines.length === 0) {
-		return { scene: null, error: `No coastline is bundled for ${spot.name} yet. Open it on the map to model it from the tiles.` };
+		return { scene: null, error: spot.modelNote ?? `No coastline is bundled for ${spot.name} yet. Open it on the map to model it from the tiles.` };
 	}
 	try {
 		return { scene: buildScene(spot, coast, dx) };

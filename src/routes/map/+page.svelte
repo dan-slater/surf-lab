@@ -7,7 +7,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Map, Pins, Panel, Overlay, distanceMeters, type Pin, type OverlayFrame } from '@dan-slater/map-kit';
+	import { Map, Pins, Panel, Overlay, coastlineNear, distanceMeters, type Pin, type OverlayFrame } from '@dan-slater/map-kit';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import SimView from '#lib/ui/SimView.svelte';
 	import SpotFacts from '#lib/ui/SpotFacts.svelte';
@@ -49,7 +49,7 @@
 		});
 		if (import.meta.env.DEV) {
 			// hooks for the headless checks in scripts/
-			(window as any).__surflab = { simulateAt, coastAt, map: () => map, state: () => ({ scene: scene && { key: scene.key, grid: scene.grid, squeezed: scene.squeezed, guarded: scene.guarded }, message, busy }) };
+			(window as any).__surflab = { simulateAt, coastAt, map: () => map, raw: (o: any) => coastlineNear(map!, o).then((r) => ({ n: r.polylines.length, stats: r.stats })), state: () => ({ scene: scene && { key: scene.key, grid: scene.grid, squeezed: scene.squeezed, guarded: scene.guarded }, message, busy }) };
 		}
 	});
 
@@ -57,8 +57,8 @@
 		panelOpen = selectedPin !== null;
 	});
 
-	async function coastAt(lon: number, lat: number): Promise<TileCoast | null> {
-		const c = await tileCoast(map!, lon, lat, RADIUS);
+	async function coastAt(lon: number, lat: number, radius = RADIUS): Promise<TileCoast | null> {
+		const c = await tileCoast(map!, lon, lat, radius);
 		if (c && (c.flipped || c.unchecked)) console.info(`coast at ${lon.toFixed(4)},${lat.toFixed(4)}: ${c.flipped} polylines flipped, ${c.unchecked} unchecked`);
 		return c;
 	}

@@ -59,6 +59,8 @@ export interface Spot {
 	recipe: BathyOverrides;
 	frame?: SpotFrame;
 	sections?: Section[];
+	/** why the sim does not (yet) model this spot, when it does not */
+	modelNote?: string;
 	/** 'jbay' for the OSM polyline in jbay.json; otherwise coasts/<slug>.json from map tiles */
 	coastSource?: 'jbay' | 'tiles';
 }

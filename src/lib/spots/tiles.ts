@@ -2,20 +2,22 @@
  * Coastlines from the map's vector tiles, with each polyline's water side
  * checked against the rendered water layer.
  *
- * map-kit's coastlineNear promises water on the left, and that holds where the
- * coast is a polygon's outer ring. Where the land is a hole in a water polygon
- * the ring runs the other way and the water is on the right (Durban beach,
- * 2026-10-09). So every polyline is probed: points a few metres either side
- * of several of its segments are tested with queryRenderedFeatures, and the
- * polyline is reversed when the votes say the water is on the right.
+ * map-kit v0.1.0's coastlineNear documents water on the left. Measured against
+ * the rendered map on 2026-10-09 it is the other way round almost everywhere:
+ * at 18 of the 19 catalogue coasts and at Durban, the water was on the right.
+ * So every polyline is probed: points either side of several of its segments
+ * are tested with queryRenderedFeatures, and the polyline is reversed when the
+ * votes say the water is on the right. A polyline that cannot be probed (off
+ * screen, or both sides alike) follows the majority of the ones that could,
+ * and is reversed when none could, which is the measured behaviour.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { coastlineNear } from '@dan-slater/map-kit';
+import { coastlineNear, distanceMeters } from '@dan-slater/map-kit';
 import type { Polyline } from '../sim/bathy';
 import type { Coast } from './coasts';
 
-const OFFSET_M = 12;
-const PROBES = 9;
+const OFFSET_PX = 4;
+const PROBES = 11;
 
 function isWater(map: MapLibreMap, lon: number, lat: number): boolean | null {
 	const p = map.project([lon, lat]);
@@ -27,7 +29,7 @@ function isWater(map: MapLibreMap, lon: number, lat: number): boolean | null {
 }
 
 /** +1 water on the left, -1 on the right, 0 undecided */
-function waterSide(map: MapLibreMap, line: Polyline, toLonLat: (x: number, y: number) => [number, number]): number {
+function waterSide(map: MapLibreMap, line: Polyline, toLonLat: (x: number, y: number) => [number, number], off: number): number {
 	let vote = 0;
 	const n = line.length - 1;
 	for (let k = 0; k < PROBES; k++) {
@@ -38,8 +40,8 @@ function waterSide(map: MapLibreMap, line: Polyline, toLonLat: (x: number, y: nu
 		const mx = (ax + bx) / 2, my = (ay + by) / 2;
 		// left normal of the direction of travel
 		const lx = -(by - ay) / len, ly = (bx - ax) / len;
-		const left = isWater(map, ...toLonLat(mx + OFFSET_M * lx, my + OFFSET_M * ly));
-		const right = isWater(map, ...toLonLat(mx - OFFSET_M * lx, my - OFFSET_M * ly));
+		const left = isWater(map, ...toLonLat(mx + off * lx, my + off * ly));
+		const right = isWater(map, ...toLonLat(mx - off * lx, my - off * ly));
 		if (left === null || right === null || left === right) continue;
 		vote += left ? 1 : -1;
 	}
@@ -58,11 +60,18 @@ export async function tileCoast(map: MapLibreMap, lon: number, lat: number, radi
 	const res = await coastlineNear(map, { lon, lat, radiusMeters: radius, classes: ['ocean'], minLengthMeters: 100 });
 	if (!res.polylines.length) return null;
 	const toLonLat = (x: number, y: number) => res.frame.toLonLat(x, y) as [number, number];
+	// a few pixels either side, so the probe clears the rendered line at any zoom
+	const c = map.getCenter();
+	const p0 = map.project(c);
+	const mpp = distanceMeters(c.lng, c.lat, map.unproject([p0.x + 100, p0.y]).lng, c.lat) / 100;
+	const off = Math.max(8, OFFSET_PX * mpp);
+	const lines = res.polylines.map((p) => p.points.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10] as [number, number]));
+	const sides = lines.map((l) => waterSide(map, l, toLonLat, off));
+	const majority = Math.sign(sides.reduce((a, b) => a + b, 0)) || -1;
 	let flipped = 0, unchecked = 0;
-	const polylines = res.polylines.map((p) => {
-		const line = p.points.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10] as [number, number]);
-		const side = waterSide(map, line, toLonLat);
-		if (side === 0) unchecked++;
+	const polylines = lines.map((line, i) => {
+		const side = sides[i] || majority;
+		if (sides[i] === 0) unchecked++;
 		if (side < 0) {
 			flipped++;
 			line.reverse();

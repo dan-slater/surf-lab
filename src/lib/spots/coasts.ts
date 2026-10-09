@@ -4,14 +4,16 @@
  * - J-Bay: the 72-vertex OpenStreetMap polyline in jbay.json (ocean on the
  *   right), the one the parity runs use.
  * - Other catalogue spots: `coasts/<slug>.json`, captured from OpenFreeMap
- *   vector tiles by `scripts/fetch-coasts.ts` with map-kit's coastlineNear
- *   (ocean on the left).
+ *   vector tiles by `scripts/fetch-coasts.ts` through tiles.ts (ocean on the
+ *   left, checked per polyline against the rendered map).
  * - A coast clicked on the map: kept in memory and localStorage under the
  *   custom spot's slug, so "cover this spot" survives a reload.
  */
 import type { Polyline } from '../sim/bathy';
-import { JBAY } from './jbay';
+import { JBAY_COAST } from './jbay';
 import type { Spot } from './spots';
+
+export { JBAY_COAST };
 
 export interface Coast {
 	polylines: Polyline[];
@@ -34,8 +36,6 @@ export interface CoastFile extends Coast {
 const files = import.meta.glob<CoastFile>('./coasts/*.json', { import: 'default' });
 const memory = new Map<string, Coast>();
 const storeKey = (slug: string) => `surflab:coast:${slug}`;
-
-export const JBAY_COAST: Coast = { polylines: [JBAY.coast], oceanSide: 'right', source: JBAY.source };
 
 /** true when a coastline is bundled for this catalogue spot */
 export function hasBundledCoast(spot: Spot): boolean {

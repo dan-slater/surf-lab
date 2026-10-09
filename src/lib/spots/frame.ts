@@ -18,9 +18,10 @@ export interface OpenSea {
 
 /**
  * Cast rays from `center` every 5 deg out to `reach` metres and score each by
- * how much of it is water, counting far samples more (open sea stays wet; a
- * harbour, lagoon or river mouth runs into land). Scores are smoothed over
- * +-15 deg so one lucky gap between piers does not win.
+ * the mean signed distance to the coast along it (positive in water). A ray
+ * straight out to sea gains distance fastest; one running along the shore
+ * stays near it, and one into a harbour, lagoon or river mouth meets land.
+ * Scores are smoothed over +-15 deg so one gap between piers does not win.
  */
 export function openSea(
 	coast: Polyline[],
@@ -40,15 +41,13 @@ export function openSea(
 		for (let r = step; r <= reach; r += step) {
 			const s = index.nearest(center[0] + r * ux, center[1] + r * uy).s;
 			total += r;
-			if (s > 0) {
-				score += r;
-				w++;
-			}
+			score += Math.max(-r, Math.min(r, s));
+			if (s > 0) w++;
 		}
 		raw[k] = score / total;
 		wet[k] = w / Math.floor(reach / step);
 	}
-	let best = 0, bestScore = -1;
+	let best = 0, bestScore = -Infinity;
 	for (let k = 0; k < n; k++) {
 		let acc = 0;
 		for (let j = -3; j <= 3; j++) acc += raw[(k + j + n) % n] * (4 - Math.abs(j));
