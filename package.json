@@ -4,19 +4,26 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "predev": "bun scripts/sync-content.mjs",
     "dev": "vite dev --host 127.0.0.1 --port 5181",
+    "prebuild": "bun scripts/sync-content.mjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5181",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "bun test"
+    "test": "bun test",
+    "sync-content": "bun scripts/sync-content.mjs"
   },
   "devDependencies": {
+    "@fontsource/libertinus-serif": "^5.3.0",
+    "@fontsource/spline-sans-mono": "^5.3.0",
     "@sveltejs/adapter-static": "^4.0.0",
     "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/bun": "^1.4.2",
+    "@types/katex": "^0.16.8",
     "@webgpu/types": "^0.1.74",
+    "katex": "^0.19.0",
     "playwright-core": "^1.64.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
