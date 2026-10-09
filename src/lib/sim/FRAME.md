@@ -6,11 +6,20 @@ Coastlines arrive as polylines in local ENU metres: x east, y north, origin at
 the spot (map-kit's `enuFrame(lat0, lon0)` produces this). J-Bay's origin is
 Supertubes, lat -34.0308, lon 24.9338.
 
-**Coast orientation:** walking a polyline in vertex order, the ocean is on the
-RIGHT. This is the OpenStreetMap coastline convention (land on the left), so
-OSM ways and water-polygon outlines traced clockwise can be passed as they
-are. A polyline with the wrong orientation produces an inverted map (sea where
-land should be); reverse it.
+**Coast orientation:** the builder needs to know which side of each polyline
+is water, judged walking the polyline in vertex order. Pass it as
+`bathyFromPolyline(..., { oceanSide })`:
+
+| source | water is on the | pass |
+|---|---|---|
+| OpenStreetMap coastline ways, `jbay.json` | right (land on the left) | `'right'` (default) |
+| map-kit `coastlineNear` (OpenMapTiles water polygons, OGC winding) | left | `'left'` |
+
+The wrong side produces an inverted map (sea where land should be).
+`coastlineNear` returns several polylines when a river mouth breaks the coast;
+pass them all as one array. Each cell takes its sign from the nearest segment,
+so near the open end of a polyline (a river mouth, the edge of the query
+circle) the land/sea split follows the extension of the end segment.
 
 ## Grid
 

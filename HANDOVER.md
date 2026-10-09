@@ -1,49 +1,46 @@
 # surf-lab — HANDOVER
 
-> ## SIM LINE (build-order step 2), 2026-10-09: module built, bathy exact, wave parity FAILS by design of first order
+> ## SIM LINE (build-order step 2), 2026-10-09: DONE. MUSCL/RK2 in, J-Bay breaks, parity with Run A at 6.25 m
 >
-> **Built (all on `main`, zulzi-gpu):** SvelteKit 3 + Svelte 5 + adapter-static scaffold (bun; `#lib/*`
-> subpath imports since SvelteKit 3 dropped `$lib`); `src/lib/sim/`: `bathy.ts`
-> (`bathyFromPolyline`), `swell.ts` (JONSWAP components, compass <-> grid angles), `step.wgsl` +
-> `fields.wgsl` + `solver.ts` (`createSolver`, faithful Run C port with swell as a component
-> buffer, stats pass, fields texture), `cpu.ts` (CPU twin), `debug-render.ts` (plain painter with a
-> grid-to-clip affine for the map overlay); `/sim` and `/sim/parity` routes; `scripts/` for headless
-> GPU runs and parity. Docs: `src/lib/sim/{README,FRAME,PARITY}.md`.
+> **Built (all on `main`):** SvelteKit 3 + Svelte 5 + adapter-static scaffold (bun, `#lib/*` subpath
+> imports). `src/lib/sim/`: `bathy.ts` (`bathyFromPolyline`, `oceanSide` option, `CoastIndex` segment
+> BVH), `swell.ts`, `config.ts` (`scheme`, `breakingDefaults`, `suggestDt`), `common.wgsl` +
+> `muscl.wgsl` (default: Run A's MUSCL-MC + SSP-RK2, two dispatches per step) + `step.wgsl`
+> (`scheme: 'first-order'`, Run C), `fields.wgsl`, `solver.ts` (`createSolver(device, ...)` on a
+> caller-owned device; `fields` texture, `buffers`, stats), `cpu.ts` (CPU twin of both schemes),
+> `debug-render.ts` (draws into a canvas or an already-configured context; `affineFromOverlay` for
+> map-kit's frame). Routes `/sim` (`?warm ?speed ?dx ?scheme ?external ?hs ?tp ?dir`) and
+> `/sim/parity`. Docs `src/lib/sim/{README,FRAME,PARITY}.md`.
 >
-> **Works, with evidence:** `bun run check` 0 errors, `bun run build` writes `build/`, `bun test` 11
-> pass. Bathy rebuilds Run A's `depth.f32` **bit-exactly** (max error 0 over 2.46 M cells) and the
-> Run C 192x512 grid exactly with `supersample: 5`. GPU matches the CPU twin to 1.2e-5 m. The 4090
-> runs 600 s of J-Bay model time in 0.32 s. Headless WebGPU on the 4090 works: Chrome spawned with
-> `--headless=new --no-sandbox` + Vulkan flags, attached over CDP (`scripts/browser.ts`); the first
-> `requestAdapter` returns null, so pages retry. Headless page screenshots do not composite WebGPU
-> canvases; `scripts/shot.ts` reads the canvas with `toDataURL`.
+> **Evidence:** `bun run check` 0 errors; `bun run build` ok; `bun test` 16 pass (lake at rest and
+> wave speed for both schemes, MUSCL keeps more than 85 % over 500 m, index exactly equals brute force).
+> Bathymetry is bit-exact against Run A's `depth.f32`. Against Run A on J-Bay (GPU, headless Chrome on the
+> 4090): **MUSCL 6.25 m:** interior Hs 91 % of Run A (98 % inside 3 m), 8 of 8 sections break, foam
+> cover 1.34 % vs 1.18 %, 600 s of model time in 0.44 s. **MUSCL 12.5 m:** 79 %, 6 of 8, 0.31 s.
+> **First order 12.5 m:** 10 %, none, kept as an option only. Images in `docs/img/`.
 >
-> **Does not work: J-Bay does not break.** First-order HLL at 12.5 m diffuses a 15 s swell with an
-> e-folding distance of ~265 m; the wavemaker is 1.3 to 1.5 km offshore. Interior Hs is 10 % of Run
-> A's (3 to 8 % inside 10 m depth), foam coverage 0.02 % vs 1.18 %, no break line at 4 of 8
-> sections. The ORIGINAL Run C demo, rebuilt in a scratchpad and captured, shows the same: its
-> "foam band" is a waterline fringe, not breaking (`docs/img/runc-original-t420.png`). Full
-> numbers: `src/lib/sim/PARITY.md`. `/sim` runs (60 fps, `?warm=300` skips spin-up) but shows
-> swell dying offshore.
+> **Decisions made here (review):** the default grid for J-Bay is 6.25 m (384 x 1024), with 12.5 m as
+> the weak-GPU fallback. The default dt is Courant 0.4 (0.126 s at 6.25 m). The Froude breaking threshold
+> scales with the grid (`0.65 - 0.024 dx`: 0.50 at 6.25 m, 0.35 at 12.5 m) and was fitted to Run A's
+> foam cover on this one run. Break-line positions were not fitted and land 0 to 25 m seaward of
+> Run A's.
 >
-> **MUSCL/RK2, what it would take (scoped OUT of this step by the brief; now the blocker for
-> "J-Bay breaking"):** port `surf-sim/solver/swe2d.py` `compute_L` (MUSCL-MC on eta/u/v, first order
-> at wet/dry fronts, Audusse on reconstructed states) into `step.wgsl` as an L(U) kernel, add a third
-> state buffer and run SSP-RK2 as two dispatches per step; mirror in `cpu.ts`; rerun the parity
-> scripts (minutes). About one day. Cost ~4x flux work per step, partly repaid by Run A's CFL 0.40
-> vs Run C's ~0.19; the GPU headroom is large (15 600 steps/s vs ~180 needed for 3 substeps at
-> 60 fps). Unknown until measured: whether 12.5 m is fine enough in the surf zone (a 15 s wave in
-> 3 m of water is ~6.5 cells long); 6.25 m (4x cells) may be needed. Keep first order as an option.
+> **For step 3 (mounting in the map overlay):** `createSolver(frame.gpu.device, ...)`, then
+> `createDebugRenderer(solver, { context, format })`, and `affineFromOverlay(grid, coast.frame, frame)`
+> in `ondraw`. `coastlineNear` polylines go in as one array with `{ oceanSide: 'left' }`; the index
+> handles thousands of vertices (4000-vertex coast, 24 k cells: 15 ms, brute force 268 ms).
+> Still to build: choosing a GridSpec (rotation, land on the low-ix side) from a clicked coast, and
+> the product renderer. Snippet in `src/lib/sim/README.md`.
 >
-> **Open questions:** (1) go/no-go on MUSCL/RK2 in the browser (decides whether step 3 shows
-> breaking waves); (2) map-kit's exact `enuFrame` API (assumed `toLonLat`-style inverse in
-> `src/lib/sim/README.md`); (3) coast orientation from vector-tile water polygons (the builder
-> needs ocean on the right, FRAME.md).
+> **Open questions:** (1) whether laptop GPUs hold 6.25 m in real time (needs ~8 steps/s of 393 k
+> cells; the 4090 does ~11 000 steps/s; worth a Mac check of `/sim`, fps is on the page);
+> (2) whether the random sea state should reproduce Run A's exactly (it uses a different PRNG
+> from numpy's, so the statistics agree and the individual crests do not).
 >
-> **Next for this line:** MUSCL/RK2 if approved, then parity rerun; breaking thresholds back toward
-> Run A's (0.40 / 0.60, d < 5 m) once waves arrive; a spatial index in `bathyFromPolyline` for
-> tile coastlines with thousands of vertices (now brute force, 20 ms for 72 vertices at 98 k cells).
-> Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim`.
+> **Next for this line, if wanted:** a GridSpec-from-coast helper for the click-any-coast flow;
+> per-spot breaking calibration in the catalogue; a CPU-twin parity run at 6.25 m (about 15 min,
+> not done; the GPU and twin agree at 12.5 m).
+> Dev server: tmux `surflab-dev`, `http://127.0.0.1:5181/sim?warm=300`.
 
 > ## 🌊 SURF-LAB + MAP-KIT: design settled, build via factory lines on zulzi (2026-10-08) — READ THIS FIRST
 >
