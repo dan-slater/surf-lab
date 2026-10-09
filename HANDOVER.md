@@ -1,54 +1,54 @@
 # surf-lab — HANDOVER
 
-> ## BOOK LINE (build-order step 5), 2026-10-09: book done; instruments now reflow to 360 px; direction reads deep-water
+> ## BOOK LINE (build-order step 5), 2026-10-09: book done, main merged in, the 2-D instrument breaks on the MUSCL solver
 >
 > **Built (branch `book`, worktree `~/code/surf-lab-book`):** `/book` (contents, nine ledes) and
 > `/book/[chapter]`: text left, the section's instrument pinned right and swapped on scroll
-> (IntersectionObserver on section headings), a picker to override and "follow" to resume, a
-> swell strip (Hs, Tp, direction) that drives every instrument. Under 1100 px each section gets its
-> instrument inline, mounted lazily. All chapter fields render (lede, body, on the wave, figure
-> brief, key equations with worked examples, references with why-read-it, revision notes); `[n]`
-> links to the references, `#slug` to chapter routes. `/book/instruments` shows all 21.
-> `scripts/sync-content.mjs` copies `$SURF_BOOK_DIR` (default `~/surf-physics-book/chapters`) into
-> git-ignored `content/chapters/`, fails loudly if missing; wired as `predev` and `prebuild`.
-> KaTeX renders at BUILD time on the raw strings (`src/routes/book/math.ts`) because `breaking`
-> and `swell` hold bare `\(u < c\)` / `\(h > L/2\)` that client auto-render cannot survive; no KaTeX
-> JS ships. Libertinus Serif for prose (Libertinus Math unused: KaTeX cannot take it).
+> (IntersectionObserver on section headings), a picker to override and "follow" to resume, a swell
+> strip (Hs, Tp, deep-water direction) driving every instrument; under 1100 px each section's
+> instrument sits inline, mounted lazily. Every chapter field renders; `[n]` links to references,
+> `#slug` to chapter routes. `/book/instruments` shows all 21. `scripts/sync-content.mjs` copies
+> `$SURF_BOOK_DIR` into git-ignored `content/chapters/` (`predev`, `prebuild`), failing loudly if
+> missing. KaTeX renders at build time on the raw strings (`src/routes/book/math.ts`; bare `<` in
+> two chapters' maths rules out client auto-render). Instruments: P1 to P6 lifted with maths and
+> drawing unchanged, fifteen derived from their chapters' equations (`src/lib/instruments/README.md`),
+> all reflowing down to 360 px. State hook: `HOOK(app state)` in `src/routes/book/[chapter]/+page.svelte`.
 >
-> **Instruments (`src/lib/instruments/`, README there):** P1 to P6 lifted, maths and drawing code
-> unchanged (headless against the original: P1 and P3 readouts identical, P5 time step agrees).
-> Fifteen derived from their chapters' own equations; the tests reproduce the chapters' worked
-> examples. `instrumentFor(slug, i)` in `map.ts`.
-> - **Since the last block, phones:** below 600 CSS px every instrument reflows to the real width
->   (logical width = CSS width, so labels keep their pixel size): two-panel figures stack, ticks
->   thin, long labels shorten or drop, the J-Bay section strip wraps to two rows, readouts stack one
->   item per line (container query). Maths identical. No sideways scrolling.
-> - **Direction:** every instrument, `Sim2D` included, takes the deep-water `dirDeg` (225° for
->   J-Bay). `Sim2D` converts with `generatorDirectionFor(deepWaterDeg, grid, depth)` in
->   `direction.ts`, a J-Bay-only stand-in from Run A's pair (225° → 120°); when the sim line's
->   `generatorDirection` lands, its body becomes one `return generatorDirection(...)` line.
-> - **Peel angles:** `SectionSpeed` keeps 45° per J-Bay section; its caption says this is a
->   placeholder until the sim measures them.
-> - **State hook:** `src/routes/book/[chapter]/+page.svelte`, comment `HOOK(app state)`: replace
->   the local `swell` $state with the store (one line) and drop the swell strip.
+> **Since the last block:**
+> - `git merge main` into `book` (`48d3431`): one conflict, HANDOVER.md only (kept this block,
+>   took main's SIM LINE block). No conflicts in code.
+> - `Sim2D` now runs as the sim line's `/sim` does: MUSCL-MC + SSP-RK2 at 6.25 m (384 × 1024), 75 m
+>   wavemaker band, 150 m sponges, 300 s warm-up, 6 model seconds per wall second (capped per
+>   frame). It takes the deep-water `dirDeg` and converts with the sim line's
+>   `generatorDirection(dirDeg, grid, wavemakerDepth(...), { Tp })`; the stand-in `direction.ts` is
+>   gone. Readout: "deep water from 225° → 129° at the wavemaker (from behind the coast: wraps the
+>   headland)".
+> - **What it shows (headless, 4090):** the swell reaches the coast at full height with crests
+>   oblique to the shore, and J-Bay breaks: white foam in a narrow band on the inner edge of the
+>   shelf, in patches a few cells (tens of metres) long that move between frames as crests arrive,
+>   most of it from Boneyards past the Point. Near-white pixels are 0.16 to 0.23 % of the canvas
+>   (land included) across t = 312 to 494 s. The caption says this, plus "modelled from the
+>   coastline" and "breaking rule fitted to one reference run". The no-WebGPU fallback is now a
+>   MUSCL frame (`src/lib/instruments/assets/sim-jbay-muscl.png`).
+> - The sim line's `scripts/browser.ts` `warmGpu` breaks now that `/` navigates client-side; my
+>   screenshot script warms on `/book` itself.
 >
-> **Works, with evidence:** `bun run check` 0 errors 0 warnings; `bun test` 27 pass (11 sim, 16
-> book); `bun run build` prerenders `/book`, nine chapters, `/book/instruments`: 213 KaTeX blocks,
-> 0 errors, 0 leftover delimiters. `bun scripts/shoot-instruments.ts` (headless Chrome on the 4090
-> via the sim line's `scripts/browser.ts`): every instrument at desktop (`docs/img/instruments/<id>.png`)
-> and at 360 and 390 px (`<id>-360.png`, `<id>-390.png`), with an assertion of **no horizontal
-> overflow at 360 or 390 px** (passes for all 21); the bench on `/book/breaking` swaps P1 → P3 →
-> P2 → Iribarren → P4 while scrolling; the 2-D sim runs live (readout "deep water from 225°, 120° at
-> the wavemaker"). Page shots in `docs/img/book/`. Console noise: only `/favicon.ico` 404 (app line).
-> Dev server: tmux `surflab-book`, `http://127.0.0.1:5183/book`.
+> **Works, with evidence:** `bun run check` 0 errors 0 warnings (411 files); `bun test` 47 pass
+> (31 sim, 16 book); `bun run build` prerenders `/book`, nine chapters and `/book/instruments`: 213
+> KaTeX blocks, 0 errors. `bun scripts/shoot-instruments.ts`: all 21 instruments reshot at desktop,
+> 360 and 390 px (`docs/img/instruments/`), no horizontal overflow at either phone width; the
+> bench on `/book/breaking` swaps P1 → P3 → P2 → Iribarren → P4 on scroll. Console noise: only
+> `/favicon.ico` 404. Dev server: tmux `surflab-book`, `http://127.0.0.1:5183/book`.
 >
-> **Open questions:** (1) this branch still has the first-order sim; main now has MUSCL + RK2, so
-> `Sim2D`'s caption ("does not break here yet") needs revisiting after merge. (2) The direction
-> stand-in assumes Run A's 105° turn holds across J-Bay's whole swell window.
+> **Open questions:** (1) the MUSCL solver at 6.25 m is heavy for weak GPUs; the instrument caps
+> steps per frame so it falls behind rather than stalls, but it is untested off the 4090. (2) The
+> foam band is a few cells wide at this scale; whether that matches a real J-Bay surf zone is the
+> sim line's calibration question. (3) `scripts/browser.ts` `warmGpu` (sim line's) should warm on a
+> page that does not navigate.
 >
-> **Next for this line:** swap in `generatorDirection` when it lands; bind the state hook when
-> `#lib/state` lands; re-caption `Sim2D` against the MUSCL solver; draw the chapters' figure briefs
-> as static SVG.
+> **Next for this line:** bind the state hook when `#lib/state` lands; draw the chapters' figure
+> briefs as static SVG; per-section peel angles in `SectionSpeed` once the sim's breaking fronts
+> can measure them (main has "Track breaking fronts for surfers").
 
 > ## SIM LINE, 2026-10-09: step 2 accepted; grid-from-coast, swell-direction conversion and the CPU parity run DONE
 >
