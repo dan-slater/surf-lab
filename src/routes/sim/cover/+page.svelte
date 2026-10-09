@@ -9,6 +9,8 @@
 	import { createRenderer } from '#lib/sim/render/renderer.ts';
 	import { viewAffine, viewToPixel } from '#lib/sim/render/view.ts';
 	import { createFrontTracker } from '#lib/sim/render/fronts.ts';
+	import { createSurfers } from '#lib/sim/render/surfers.ts';
+	import { drawRig, drawSitter, poseAt, POSES } from '#lib/sim/render/rig.ts';
 	import { JBAY, JBAY_RUN_A_SWELL, jbayGrid } from '#lib/spots/jbay.ts';
 
 	let canvas: HTMLCanvasElement;
@@ -51,6 +53,12 @@
 			const tracker = createFrontTracker(solver, grid);
 			const ctx2d = overlay.getContext('2d')!;
 			const showFronts = q.get('fronts') === '1';
+			const nSurf = Number(q.get('surfers') ?? 8);
+			const crowd = createSurfers({
+				zones: JBAY.sections.filter((x) => x.name !== 'Kitchen Windows').map((x) => [x.x, x.y] as [number, number]),
+				depth, grid, count: nSurf, seed: Number(q.get('seed') ?? 7)
+			});
+			let lastModel = solver.time;
 			const r = createRenderer(solver, {
 				context, format, pixelRatio: pr, affine: [1, 0, 0, 0, 1, 0],
 				look: { foamOpacity: q.get('foam') === '0' ? 0 : undefined }
@@ -59,7 +67,7 @@
 			resize();
 			addEventListener('resize', resize);
 			const speed = Number(q.get('speed') ?? 10);
-			let owed = 0, prev = performance.now(), frames = 0, lastHud = prev;
+			let owed = 0, prev = performance.now(), frames = 0, lastHud = prev, prev0 = prev;
 			const frame = () => {
 				if (!alive || !solver) return;
 				const now = performance.now();
@@ -71,6 +79,9 @@
 				r.draw(solver.time);
 				tracker.update();
 				const fronts = tracker.fronts();
+				crowd.update(solver.time - lastModel, Math.min(now - prev0, 100) / 1000, fronts);
+				lastModel = solver.time;
+				prev0 = now;
 				(window as unknown as { __fronts: unknown }).__fronts = { t: solver.time, fronts };
 				ctx2d.setTransform(pr, 0, 0, pr, 0, 0);
 				ctx2d.clearRect(0, 0, innerWidth, innerHeight);
@@ -92,6 +103,34 @@
 						}
 					}
 				}
+				crowd.draw(ctx2d, toPx, innerWidth / view.metersAcross);
+				if (q.get('rig') === '1') {
+					// every pose at 2x the P6 scale, for checking the rig
+					const st = { board: '#ff8a5c', body: '#f2efe6', lw: 2.2 };
+					const items: [string, (c: CanvasRenderingContext2D) => void][] = [
+						['lineup', (c) => drawSitter(c, 1.4, st)],
+						['paddle', (c) => drawRig(c, POSES[0], 1.4, st, now / 160)],
+						['pop-up', (c) => drawRig(c, poseAt(1), 1.4, st)],
+						['trim', (c) => drawRig(c, poseAt(2), 1.4, st)],
+						['bottom turn', (c) => drawRig(c, poseAt(3), 1.4, st, null, -8)],
+						['top turn', (c) => drawRig(c, poseAt(4), 1.4, st, null, 10)],
+						['tube', (c) => drawRig(c, poseAt(5), 1.4, st)],
+						['wipe-out', (c) => { c.rotate(1.2); drawRig(c, poseAt(1), 1.4, st, null, 60); }]
+					];
+					ctx2d.fillStyle = 'rgba(6,14,23,0.85)';
+					ctx2d.fillRect(0, 0, innerWidth, 230);
+					items.forEach(([name, fn], i) => {
+						ctx2d.save();
+						ctx2d.translate(90 + i * 165, 160);
+						fn(ctx2d);
+						ctx2d.restore();
+						ctx2d.fillStyle = '#8fa8ad';
+						ctx2d.font = '11px ui-monospace, monospace';
+						ctx2d.fillText(name.toUpperCase(), 50 + i * 165, 215);
+					});
+				}
+				(window as unknown as { __surfers: unknown }).__surfers = crowd.surfers.map((x) => ({ state: x.state, rides: x.rides, wipeouts: x.wipeouts }));
+				(window as unknown as { __rides: unknown }).__rides = crowd.log;
 				frames++;
 				if (now - lastHud > 500) {
 					hud = `t ${solver.time.toFixed(0)} s, ${((frames * 1000) / (now - lastHud)).toFixed(0)} fps`;
