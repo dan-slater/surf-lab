@@ -53,7 +53,7 @@ export function axes(
 	ctx.textAlign = 'center';
 	if (o.xLabel) ctx.fillText(o.xLabel, box.x + box.w / 2, box.y + box.h + 30);
 	if (o.yLabel) {
-		ctx.translate(box.x - 40, box.y + box.h / 2);
+		ctx.translate(Math.max(box.x - 40, 12), box.y + box.h / 2);
 		ctx.rotate(-Math.PI / 2);
 		ctx.fillText(o.yLabel, 0, 0);
 	}
@@ -147,5 +147,21 @@ export function arrow(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1:
 	ctx.moveTo(x1, y1);
 	ctx.lineTo(x1 - head * Math.cos(ang + 0.4), y1 - head * Math.sin(ang + 0.4));
 	ctx.stroke();
+	ctx.restore();
+}
+
+/** A label at (x, y), flipped to end at x - 2 * pad when it would run past `right`. */
+export function fitLabel(ctx: CanvasRenderingContext2D, COL: Palette, text: string, x: number, y: number, color: string, right: number, px = 10, pad = 4) {
+	ctx.save();
+	ctx.font = COL.font(px);
+	const w = ctx.measureText(text).width;
+	ctx.fillStyle = color;
+	if (x + pad + w > right) {
+		ctx.textAlign = 'right';
+		ctx.fillText(text, x - pad, y);
+	} else {
+		ctx.textAlign = 'left';
+		ctx.fillText(text, x + pad, y);
+	}
 	ctx.restore();
 }

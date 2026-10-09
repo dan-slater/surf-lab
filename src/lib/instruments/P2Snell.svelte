@@ -23,7 +23,7 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 360, draw);
+	useStage(() => canvas, { W: 880, H: 360, narrowH: (w) => w * 1.05 }, draw);
 
 	function draw({ ctx, W, H, col: COL }: Stage) {
 		const shoreY=44, deepY=H-16, d0=60;

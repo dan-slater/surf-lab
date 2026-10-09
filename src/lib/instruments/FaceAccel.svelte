@@ -27,14 +27,15 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 330, draw);
+	// narrow: the power plot stacks under the acceleration plot
+	useStage(() => canvas, { W: 880, H: 330, narrowH: () => 430 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const rad = (d: number) => (d * Math.PI) / 180;
-		const A = axes(ctx, COL, { x: 60, y: 20, w: 470, h: H - 70 }, [0, 90], [0, 0.55], {
-			xTicks: [0, 15, 30, 45, 60, 75, 90],
+		const A = axes(ctx, COL, narrow ? { x: 44, y: 16, w: W - 56, h: 180 } : { x: 60, y: 20, w: 470, h: H - 70 }, [0, 90], [0, 0.55], {
+			xTicks: narrow ? [0, 30, 45, 60, 90] : [0, 15, 30, 45, 60, 75, 90],
 			yTicks: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
 			xLabel: 'face angle θ [deg]',
 			yLabel: 'A / g'
@@ -48,7 +49,7 @@
 		dot(ctx, A.X(th), A.Y(0.5 * Math.sin(2 * rad(th))), 5, COL.accent);
 
 		// right: power the face feeds you, P = M c g sin cos, against angle
-		const B = axes(ctx, COL, { x: 610, y: 20, w: W - 640, h: H - 70 }, [0, 90], [0, 3.5], {
+		const B = axes(ctx, COL, narrow ? { x: 44, y: 262, w: W - 56, h: 120 } : { x: 610, y: 20, w: W - 640, h: H - 70 }, [0, 90], [0, 3.5], {
 			xTicks: [0, 30, 60, 90],
 			yTicks: [0, 1, 2, 3],
 			xLabel: 'θ [deg]',

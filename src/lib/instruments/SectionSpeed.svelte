@@ -30,16 +30,28 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 400, draw);
+	// narrow: the section strip wraps into two rows of four
+	const st = useStage(() => canvas, { W: 880, H: 400, narrowH: () => 470 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	/** the clickable cell for each section, in logical units */
+	function cells(W: number, narrow: boolean, n: number) {
+		const x0 = narrow ? 8 : 60, x1 = W - (narrow ? 8 : 40), y0 = narrow ? 300 : 312;
+		const perRow = narrow ? Math.ceil(n / 2) : n;
+		const cw = (x1 - x0) / perRow, ch = 74;
+		return Array.from({ length: n }, (_, i) => {
+			const r = Math.floor(i / perRow), c = i % perRow;
+			return { x: x0 + c * cw, y: y0 - 8 + r * (ch + 8), w: cw, h: ch, cx: x0 + (c + 0.5) * cw, top: y0 + r * (ch + 8) };
+		});
+	}
+
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const cb = breakCelerity(Hb);
 		const ceil = cb + Math.sqrt(2 * G * Hb);
 		const vMax = Math.max(25, ceil * 1.25);
-		const A = axes(ctx, COL, { x: 60, y: 20, w: W - 100, h: 230 }, [10, 90], [0, vMax], {
-			xTicks: [10, 20, 30, 40, 50, 60, 70, 80, 90],
+		const A = axes(ctx, COL, { x: narrow ? 44 : 60, y: 20, w: W - (narrow ? 56 : 100), h: narrow ? 210 : 230 }, [10, 90], [0, vMax], {
+			xTicks: narrow ? [10, 30, 50, 70, 90] : [10, 20, 30, 40, 50, 60, 70, 80, 90],
 			yTicks: Array.from({ length: Math.floor(vMax / 5) + 1 }, (_, i) => i * 5),
 			xLabel: 'peel angle α [deg]',
 			yLabel: 'speed [m/s]',
@@ -49,7 +61,7 @@
 		const band = (lo: number, hi: number, name: string, color: string) => {
 			ctx.fillStyle = color;
 			ctx.fillRect(A.X(lo), A.box.y, A.X(hi) - A.X(lo), A.box.h);
-			label(ctx, COL, name, (A.X(lo) + A.X(hi)) / 2, A.box.y + 12, COL.muted, 'center', 9);
+			if (!narrow || name === 'crumbles') label(ctx, COL, name, (A.X(lo) + A.X(hi)) / 2, A.box.y + 12, COL.muted, 'center', 9);
 		};
 		band(35, 45, 'speed', COL.a(COL.teal, 0.08));
 		band(48, 56, 're-entry', COL.a(COL.gold, 0.08));
@@ -57,27 +69,28 @@
 		band(70, 90, 'crumbles', COL.a(COL.foam, 0.04));
 		curve(ctx, A, (a) => cb / Math.sin((a * Math.PI) / 180), COL.teal, 2.2, [], [10, 90]);
 		hline(ctx, A, ceil, COL.accent, [6, 5]);
-		label(ctx, COL, `ceiling c_b + √(2gH_b) = ${fmt(ceil, 1)} m/s`, A.X(89), A.Y(ceil) - 6, COL.accent, 'right');
+		label(ctx, COL, narrow ? `ceiling ${fmt(ceil, 1)} m/s` : `ceiling c_b + √(2gH_b) = ${fmt(ceil, 1)} m/s`, A.X(89), A.Y(ceil) - 6, COL.accent, 'right');
 		hline(ctx, A, cb, COL.a(COL.tealHi, 0.4));
 		label(ctx, COL, `wave c_b = ${fmt(cb, 1)}`, A.X(89), A.Y(cb) - 6, COL.muted, 'right');
 		const vp = cb / Math.sin((alpha * Math.PI) / 180);
 		dot(ctx, A.X(alpha), A.Y(Math.min(vp, vMax)), 5, vp <= ceil ? COL.good : COL.accent);
 
 		// section strip
-		const y0 = 312, x0 = 60, x1 = W - 40;
-		label(ctx, COL, `${spot.name.toUpperCase()}: CLICK A SECTION, SET ITS PEEL ANGLE`, x0, y0 - 20, COL.muted);
 		const n = spot.sections.length;
-		spot.sections.forEach((s, i) => {
-			const x = x0 + ((i + 0.5) / n) * (x1 - x0);
+		const geo = cells(W, narrow, n);
+		label(ctx, COL, narrow ? 'SECTIONS: TAP ONE, SET ITS ANGLE' : `${spot.name.toUpperCase()}: CLICK A SECTION, SET ITS PEEL ANGLE`, geo[0].x, geo[0].y - 12, COL.muted);
+		const fs = narrow ? 0.9 : 1;
+		spot.sections.forEach((sec, i) => {
+			const g = geo[i];
 			const a = sectionAlpha[i] ?? 45;
 			const v = cb / Math.sin((a * Math.PI) / 180);
 			const ok = v <= ceil;
 			ctx.fillStyle = i === selected ? COL.a(COL.teal, 0.18) : COL.a(COL.teal, 0.05);
-			ctx.fillRect(x - (x1 - x0) / n / 2 + 2, y0 - 8, (x1 - x0) / n - 4, 74);
-			label(ctx, COL, s.name, x, y0 + 8, i === selected ? COL.foam : COL.muted, 'center', 9.5);
-			label(ctx, COL, `${fmt(a, 0)}°`, x, y0 + 28, COL.tealHi, 'center', 11);
-			label(ctx, COL, `${fmt(v, 1)} m/s`, x, y0 + 46, ok ? COL.good : COL.accent, 'center', 10);
-			label(ctx, COL, ok ? 'makeable' : 'runs away', x, y0 + 60, ok ? COL.good : COL.accent, 'center', 9);
+			ctx.fillRect(g.x + 2, g.y, g.w - 4, g.h);
+			label(ctx, COL, sec.name, g.cx, g.top + 8, i === selected ? COL.foam : COL.muted, 'center', 9.5 * fs);
+			label(ctx, COL, `${fmt(a, 0)}°`, g.cx, g.top + 28, COL.tealHi, 'center', 11);
+			label(ctx, COL, `${fmt(v, 1)} m/s`, g.cx, g.top + 46, ok ? COL.good : COL.accent, 'center', 10 * fs);
+			label(ctx, COL, ok ? 'makeable' : 'runs away', g.cx, g.top + 60, ok ? COL.good : COL.accent, 'center', 9);
 		});
 		readout =
 			`H<sub>b</sub>=<b>${fmt(Hb, 1)} m</b> → c<sub>b</sub>=√(2.0gH<sub>b</sub>)=<b>${fmt(cb, 1)} m/s</b> · at α=<b>${fmt(alpha, 0)}°</b> the break point runs at c/tanα=<b>${fmt(cb / Math.tan((alpha * Math.PI) / 180), 1)}</b> and you need c/sinα=<b>${fmt(vp, 1)} m/s</b> (${fmt(vp * 3.6, 0)} km/h)` +
@@ -85,13 +98,13 @@
 	}
 
 	function pick(e: MouseEvent) {
+		const stg = st.stage;
+		if (!stg) return;
 		const cv = e.currentTarget as HTMLCanvasElement;
 		const r = cv.getBoundingClientRect();
-		const x = ((e.clientX - r.left) / r.width) * 880, y = ((e.clientY - r.top) / r.height) * 400;
-		if (y < 296) return;
-		const n = spot.sections.length;
-		const i = Math.floor(((x - 60) / (880 - 100)) * n);
-		if (i >= 0 && i < n) {
+		const x = ((e.clientX - r.left) / r.width) * stg.W, y = ((e.clientY - r.top) / r.height) * stg.H;
+		const i = cells(stg.W, stg.narrow, spot.sections.length).findIndex((g) => x >= g.x && x < g.x + g.w && y >= g.y && y < g.y + g.h);
+		if (i >= 0) {
 			selected = i;
 			alpha = sectionAlpha[i];
 		}
@@ -117,8 +130,7 @@
 	{/snippet}
 	{#snippet caption()}
 		The demand V<sub>p</sub> = c<sub>b</sub>/sin α against the drag-free ceiling c<sub>b</sub> + √(2gH<sub>b</sub>),
-		with Scarfe's field bands for speed sections, re-entries and cutbacks. The review gives no peel angle per J-Bay
-		section, so the strip starts every section at 45° for you to set; the 2-D simulation will measure them once it
-		breaks.
+		with Scarfe's field bands for speed sections, re-entries and cutbacks. The 45° on every J-Bay section is a
+		placeholder until the sim measures them; set your own.
 	{/snippet}
 </Frame>

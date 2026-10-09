@@ -7,7 +7,7 @@
 	import Frame from './Frame.svelte';
 	import Slider from './Slider.svelte';
 	import { clamp, fmt, deepLength, iribarren, breakerType } from './physics';
-	import { axes, curve, dot, label } from './plot';
+	import { axes, curve, dot, fitLabel, label } from './plot';
 	import { useStage } from './use-stage.svelte';
 	import { DEFAULT_SWELL, type SwellProps } from './types';
 	import type { Stage } from './stage';
@@ -23,15 +23,15 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 340, draw);
+	useStage(() => canvas, { W: 880, H: 340, narrowH: (w) => Math.max(280, w * 0.85) }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const maxTan = 0.35;
 		const xiMax = 5;
-		const A = axes(ctx, COL, { x: 60, y: 20, w: W - 100, h: H - 70 }, [0, maxTan], [0, xiMax], {
-			xTicks: [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35],
+		const A = axes(ctx, COL, { x: narrow ? 46 : 60, y: 20, w: W - (narrow ? 56 : 100), h: H - 70 }, [0, maxTan], [0, xiMax], {
+			xTicks: narrow ? [0, 0.1, 0.2, 0.3] : [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35],
 			yTicks: [0, 0.5, 1, 2, 3.3, 4, 5],
 			xFmt: (v) => (v === 0 ? '0' : `1:${fmt(1 / v, 0)}`),
 			xLabel: 'seabed slope tan α',
@@ -49,7 +49,7 @@
 		// xi against slope for this swell, and for 8 s and 20 s at the same height
 		for (const [t, style, w] of [[8, COL.a(COL.tealHi, 0.35), 1], [20, COL.a(COL.tealHi, 0.35), 1], [T, COL.teal, 2.2]] as const) {
 			curve(ctx, A, (s) => iribarren(s, H0, t), style, w);
-			if (t !== T) {
+			if (t !== T && !narrow) {
 				const s = Math.min(maxTan * 0.92, 4.6 / (1 / Math.sqrt(H0 / deepLength(t))));
 				label(ctx, COL, `${t} s`, A.X(s) + 4, A.Y(iribarren(s, H0, t)) - 4, COL.muted);
 			}
@@ -57,7 +57,7 @@
 		const tan = 1 / n;
 		const xi = iribarren(tan, H0, T);
 		dot(ctx, A.X(tan), A.Y(Math.min(xi, xiMax)), 5, COL.accent);
-		label(ctx, COL, `${breakerType(xi)}`, A.X(tan) + 9, A.Y(Math.min(xi, xiMax)) + 4, COL.accent);
+		fitLabel(ctx, COL, breakerType(xi), A.X(tan) + 5, A.Y(Math.min(xi, xiMax)) + 4, COL.accent, A.box.x + A.box.w);
 		readout =
 			`L₀=<b>${fmt(deepLength(T), 0)} m</b> · √(H₀/L₀)=<b>${fmt(Math.sqrt(H0 / deepLength(T)), 3)}</b> · on a 1:${fmt(n, 0)} bed ξ₀=<b>${fmt(xi, 2)}</b> → <b>${breakerType(xi)}</b>` +
 			` · Galvin's H₀/(L₀m²)=1/ξ₀²=<b>${fmt(1 / (xi * xi), 2)}</b>: slope enters squared`;

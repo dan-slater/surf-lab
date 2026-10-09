@@ -8,7 +8,7 @@
 	import Frame from './Frame.svelte';
 	import Slider from './Slider.svelte';
 	import { G, clamp, fmt } from './physics';
-	import { arrow, label } from './plot';
+	import { arrow, fitLabel, label } from './plot';
 	import { useStage } from './use-stage.svelte';
 	import type { SwellProps } from './types';
 	import type { Stage } from './stage';
@@ -23,22 +23,22 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 340, draw);
+	useStage(() => canvas, { W: 880, H: 340, narrowH: (w) => Math.max(290, w * 0.85) }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const Vw = (h: number) => Math.sqrt(vc * vc + 2 * G * (Hw - h));
 		// wave profile travelling right: forward face on the right of the crest
 		const base = H - 70, amp = 170 / 5; // px per metre (5 m fills the frame)
-		const crestX = 430, Lpx = 520;
+		const crestX = narrow ? W * 0.3 : 430, Lpx = narrow ? W * 1.15 : 520;
 		const surf = (x: number) => base - Hw * amp * (0.5 + 0.5 * Math.cos(((x - crestX) / Lpx) * 2 * Math.PI)) ** 1.6;
 		ctx.strokeStyle = COL.teal;
 		ctx.lineWidth = 2;
 		ctx.beginPath();
 		for (let x = 20; x <= W - 20; x += 3) x === 20 ? ctx.moveTo(x, surf(x)) : ctx.lineTo(x, surf(x));
 		ctx.stroke();
-		label(ctx, COL, `wave advances at c = ${fmt(c, 1)} m/s →`, W - 30, 30, COL.muted, 'right');
+		label(ctx, COL, `wave advances at c = ${fmt(c, 1)} m/s →`, W - (narrow ? 8 : 30), 30, COL.muted, 'right');
 		// arrows on the forward face at h/H = 1, 0.5, 0, pointing up the face (flow runs trough → crest in the wave frame)
 		const scale = 14; // px per m/s
 		for (const frac of [1, 0.5, 0.05]) {
@@ -53,7 +53,7 @@
 			// up the face is toward the crest, i.e. leftward along the surface
 			const ux = -1 / n, uy = -slope / n;
 			arrow(ctx, x + 6 - ux * len, y - 6 - uy * len, x + 6, y - 6, frac === 0.05 ? COL.accent : COL.gold, 2);
-			label(ctx, COL, `h/H = ${frac === 0.05 ? 0 : frac}: ${fmt(Vw(frac === 0.05 ? 0 : h), 1)} m/s`, x + 14, y + 16, COL.muted);
+			fitLabel(ctx, COL, `h/H = ${frac === 0.05 ? 0 : frac}: ${fmt(Vw(frac === 0.05 ? 0 : h), 1)} m/s`, x + 10, y + 16, COL.muted, W - 4);
 		}
 		const vt = Vw(0);
 		const Hlim = (2 * c * c) / G;

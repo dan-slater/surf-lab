@@ -25,14 +25,16 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 400, draw);
+	// narrow: bar labels sit above the bars, the face figure is fitted to the width
+	useStage(() => canvas, { W: 880, H: 400, narrowH: () => 470 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const c = breakCelerity(Hb);
 		// --- speed scale 0..10 m/s with labelled bars
-		const x0 = 200, x1 = W - 40, vMax = 10;
+		const x0 = narrow ? 12 : 200, x1 = W - (narrow ? 34 : 40), vMax = 10;
+		const rowH = narrow ? 38 : 26, row0 = narrow ? 34 : 24, axisY = row0 + 6 * rowH;
 		const V = (v: number) => x0 + (v / vMax) * (x1 - x0);
 		ctx.font = COL.font(10);
 		ctx.strokeStyle = COL.grid;
@@ -41,11 +43,11 @@
 		for (let v = 0; v <= vMax; v += 1) {
 			ctx.beginPath();
 			ctx.moveTo(V(v), 18);
-			ctx.lineTo(V(v), 180);
+			ctx.lineTo(V(v), axisY);
 			ctx.stroke();
-			ctx.fillText(String(v), V(v), 194);
+			if (!narrow || v % 2 === 0) ctx.fillText(String(v), V(v), axisY + 14);
 		}
-		ctx.fillText('speed [m/s]', (x0 + x1) / 2, 208);
+		ctx.fillText('speed [m/s]', (x0 + x1) / 2, axisY + 28);
 		ctx.textAlign = 'left';
 		const bars: [string, number, number, string][] = [
 			['endurance paddle', 0.8, 1.1, COL.gold],
@@ -56,10 +58,11 @@
 			[`this wave, ${fmt(Hb, 1)} m face`, 0, c, COL.teal]
 		];
 		bars.forEach(([name, lo, hi, color], i) => {
-			const y = 24 + i * 26;
+			const y = row0 + i * rowH;
 			ctx.fillStyle = color;
 			ctx.fillRect(V(lo), y, Math.max(2, V(hi) - V(lo)), 14);
-			label(ctx, COL, name, x0 - 10, y + 11, i === 5 ? COL.tealHi : COL.muted, 'right');
+			if (narrow) label(ctx, COL, name, x0, y - 4, i === 5 ? COL.tealHi : COL.muted, 'left', 9.5);
+			else label(ctx, COL, name, x0 - 10, y + 11, i === 5 ? COL.tealHi : COL.muted, 'right');
 			label(ctx, COL, lo > 0 ? `${fmt(lo, 1)}–${fmt(hi, 1)}` : fmt(hi, 1), V(hi) + 6, y + 11, COL.muted);
 		});
 
@@ -67,8 +70,10 @@
 		const a = G * Math.sin((theta * Math.PI) / 180);
 		const dGo = ((c - u0) * (c - u0)) / (2 * a);
 		const dStill = (c * c) / (2 * a);
-		const by = H - 26, bx = 120, scale = 52; // px per metre along the face
 		const th = (theta * Math.PI) / 180;
+		const by = H - (narrow ? 44 : 26), bx = narrow ? 52 : 120;
+		// px per metre along the face: fit the standstill distance into the width when narrow
+		const scale = narrow ? Math.min(52, (W - bx - 20) / Math.max(1, dStill * 1.15 * Math.cos(th)), (by - axisY - 40) / Math.max(0.5, dStill * 1.15 * Math.sin(th))) : 52;
 		const along = (d: number): [number, number] => [bx + d * scale * Math.cos(th), by - d * scale * Math.sin(th)];
 		const faceLen = Math.min(12, Math.max(dStill * 1.15, 4));
 		ctx.strokeStyle = COL.teal;
@@ -84,11 +89,15 @@
 			ctx.beginPath();
 			ctx.arc(x, y, 4, 0, 7);
 			ctx.fill();
-			label(ctx, COL, text, x + 10, y + dy, color);
+			if (!narrow) label(ctx, COL, text, x + 10, y + dy, color);
 		};
 		mark(dStill, COL.muted, `from a standstill: ${fmt(dStill, 1)} m`, -8);
 		mark(dGo, COL.accent, `arriving at ${fmt(u0, 1)} m/s: ${fmt(dGo, 1)} m`, 14);
-		label(ctx, COL, `face at ${fmt(theta, 0)}°, wave frame: the crest gains d before you match c`, bx - 40, by + 18, COL.muted);
+		if (narrow) {
+			label(ctx, COL, `● from rest ${fmt(dStill, 1)} m`, 12, by + 18, COL.muted);
+			label(ctx, COL, `● at ${fmt(u0, 1)} m/s ${fmt(dGo, 1)} m`, W - 8, by + 18, COL.accent, 'right');
+			label(ctx, COL, `face at ${fmt(theta, 0)}°, wave frame`, 12, by + 34, COL.muted);
+		} else label(ctx, COL, `face at ${fmt(theta, 0)}°, wave frame: the crest gains d before you match c`, bx - 40, by + 18, COL.muted);
 
 		readout =
 			`c<sub>b</sub> = √(2gH<sub>b</sub>) = <b>${fmt(c, 1)} m/s</b> against a sprint of 1.6–1.9 m/s: short by about <b>${fmt(c / 1.8, 1)}×</b>` +

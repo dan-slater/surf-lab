@@ -24,10 +24,11 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 330, draw);
+	// narrow: a taller plot, tighter margins; the maths is the same
+	useStage(() => canvas, { W: 880, H: 330, narrowH: (w) => w * 0.78 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
-		const ml = 56, mr = 56, mt = 18, mb = 40;
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
+		const ml = narrow ? 40 : 56, mr = narrow ? 34 : 56, mt = 18, mb = 40;
 		const dmax=60, cmax=1.05*G*T/(2*Math.PI);
 		ctx.fillStyle=COL.ink; ctx.fillRect(0,0,W,H);
 		const X=(d: number)=>ml+(d/dmax)*(W-ml-mr), Yc=(c: number)=>H-mb-(c/cmax)*(H-mt-mb);
@@ -37,7 +38,7 @@
 		for(let d=0;d<=dmax;d+=10){ ctx.beginPath(); ctx.moveTo(X(d),mt); ctx.lineTo(X(d),H-mb); ctx.stroke(); ctx.fillText(String(d), X(d)-6, H-mb+16); }
 		for(let c=0;c<=cmax;c+=5){ ctx.beginPath(); ctx.moveTo(ml,Yc(c)); ctx.lineTo(W-mr,Yc(c)); ctx.stroke(); ctx.fillText(String(c), ml-24, Yc(c)+3); }
 		ctx.fillText("depth d [m]", W/2-30, H-8);
-		ctx.save(); ctx.translate(14,H/2+34); ctx.rotate(-Math.PI/2); ctx.fillText("speed [m/s]",0,0); ctx.restore();
+		ctx.save(); ctx.translate(narrow?10:14,H/2+34); ctx.rotate(-Math.PI/2); ctx.fillText("speed [m/s]",0,0); ctx.restore();
 		ctx.save(); ctx.translate(W-12,H/2+18); ctx.rotate(-Math.PI/2); ctx.fillStyle=COL.accent; ctx.fillText("Ks [-]",0,0); ctx.restore();
 		for(let k=1;k<=2;k+=0.5){ ctx.fillStyle=COL.accent; ctx.globalAlpha=.7; ctx.fillText(fmt(k,1), W-mr+8, Yk(k)+3); ctx.globalAlpha=1; }
 		// curves

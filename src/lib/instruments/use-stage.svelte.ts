@@ -1,5 +1,5 @@
 import { untrack } from 'svelte';
-import { createStage, loop, type Stage } from './stage';
+import { createStage, loop, type Stage, type StageSize } from './stage';
 
 /**
  * Bind a Stage to a canvas for the life of the component. `draw` runs once the
@@ -8,8 +8,7 @@ import { createStage, loop, type Stage } from './stage';
  */
 export function useStage(
 	getCanvas: () => HTMLCanvasElement | undefined,
-	W: number,
-	H: number,
+	size: StageSize,
 	draw: (s: Stage) => void
 ) {
 	let stage = $state.raw<Stage>();
@@ -17,7 +16,7 @@ export function useStage(
 		const cv = getCanvas();
 		if (!cv) return;
 		const s = untrack(() =>
-			createStage(cv, W, H, () => {
+			createStage(cv, size, () => {
 				if (stage) untrack(() => draw(stage!));
 			})
 		);

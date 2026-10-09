@@ -23,9 +23,10 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 400, draw);
+	// narrow: the plan view sits above the plot instead of beside it
+	useStage(() => canvas, { W: 880, H: 400, narrowH: () => 520 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const c0 = (G * T) / (2 * Math.PI);
@@ -36,7 +37,7 @@
 		const hb = breakDepth(Hb);
 
 		// left: plan view, crests bending to the contours
-		const px = 20, pw = 300, py = 20, ph = H - 60;
+		const px = narrow ? 8 : 20, pw = narrow ? W - 16 : 300, py = narrow ? 8 : 20, ph = narrow ? 230 : H - 60;
 		ctx.fillStyle = COL.land;
 		ctx.fillRect(px, py + ph - 18, pw, 18);
 		label(ctx, COL, 'BEACH', px + 6, py + ph - 5, COL.muted);
@@ -61,7 +62,7 @@
 		ctx.lineWidth = 1.4;
 		for (let h = 56; h > 0.6; h *= 0.72) {
 			const a = h > 58 ? r0 : ang(h);
-			const y = yOf(h), cx = px + pw / 2, half = 120;
+			const y = yOf(h), cx = px + pw / 2, half = Math.min(120, pw / 2 - 12);
 			ctx.beginPath();
 			ctx.moveTo(cx - half * Math.cos(a), y + half * Math.sin(a));
 			ctx.lineTo(cx + half * Math.cos(a), y - half * Math.sin(a));
@@ -78,8 +79,8 @@
 		label(ctx, COL, `breaks at ${fmt(hb, 1)} m`, px + 6, yOf(hb) - 5, COL.accent);
 
 		// right: angle and coefficients against depth
-		const A = axes(ctx, COL, { x: 400, y: 20, w: W - 450, h: H - 70 }, [0, 60], [0, 2], {
-			xTicks: [0, 10, 20, 30, 40, 50, 60],
+		const A = axes(ctx, COL, narrow ? { x: 44, y: 290, w: W - 56, h: H - 340 } : { x: 400, y: 20, w: W - 450, h: H - 70 }, [0, 60], [0, 2], {
+			xTicks: narrow ? [0, 20, 40, 60] : [0, 10, 20, 30, 40, 50, 60],
 			yTicks: [0, 0.5, 1, 1.5, 2],
 			xLabel: 'depth h [m]'
 		});

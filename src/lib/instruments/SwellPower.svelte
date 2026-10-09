@@ -20,17 +20,17 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 380, draw);
+	useStage(() => canvas, { W: 880, H: 380, narrowH: (w) => Math.max(300, w * 0.95) }, draw);
 
 	const RHO = 1025;
 	const power = (h: number, t: number) => (RHO * G * G * h * h * t) / (64 * Math.PI); // W per metre of crest
 	const waveBase = (t: number) => (G * t * t) / (4 * Math.PI);
 
-	function draw({ ctx, W, H: Hc, col: COL }: Stage) {
+	function draw({ ctx, W, H: Hc, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, Hc);
 		// side section: depth scale 0..350 m, sea floor rising from left to a beach at the right
-		const top = 40, bot = Hc - 30, left = 70, right = W - 40, dMax = 350;
+		const top = 40, bot = Hc - 30, left = narrow ? 50 : 70, right = W - (narrow ? 8 : 40), dMax = 350;
 		const Yd = (d: number) => top + (d / dMax) * (bot - top);
 		const floorD = (x: number) => dMax * Math.pow(1 - (x - left) / (right - left), 1.6);
 		ctx.beginPath();
@@ -53,7 +53,7 @@
 		ctx.font = COL.font(10);
 		ctx.fillStyle = COL.muted;
 		ctx.textAlign = 'right';
-		for (const d of [0, 50, 100, 150, 200, 250, 300, 350]) ctx.fillText(`${d} m`, left - 8, Yd(d) + 3);
+		for (const d of narrow ? [0, 100, 200, 300] : [0, 50, 100, 150, 200, 250, 300, 350]) ctx.fillText(`${d} m`, left - 8, Yd(d) + 3);
 		ctx.textAlign = 'left';
 		// wave base lines for 8, 14, 20 s, plus the current period
 		for (const [t, strong] of [[8, false], [14, false], [20, false], [T, true]] as const) {
@@ -67,9 +67,9 @@
 			ctx.lineTo(right, Yd(d));
 			ctx.stroke();
 			ctx.setLineDash([]);
-			label(ctx, COL, `${fmt(t, strong ? 1 : 0)} s swell feels bottom at ${fmt(d, 0)} m`, strong ? right - 4 : left + 10, Yd(d) - 5, strong ? COL.accent : COL.muted, strong ? 'right' : 'left');
+			label(ctx, COL, narrow ? `${fmt(t, strong ? 1 : 0)} s: ${fmt(d, 0)} m` : `${fmt(t, strong ? 1 : 0)} s swell feels bottom at ${fmt(d, 0)} m`, strong ? right - 4 : left + 10, Yd(d) - 5, strong ? COL.accent : COL.muted, strong ? 'right' : 'left');
 		}
-		label(ctx, COL, 'wave base = L/2 = gT²/4π ≈ 0.78 T² m', right - 4, top + 22, COL.muted, 'right');
+		label(ctx, COL, narrow ? 'wave base ≈ 0.78 T² m' : 'wave base = L/2 = gT²/4π ≈ 0.78 T² m', right - 4, top + 22, COL.muted, 'right');
 
 		const P = power(H, T);
 		const Heq6 = H * Math.sqrt(T / 6); // equal power at 6 s, H ∝ T^(-1/2)

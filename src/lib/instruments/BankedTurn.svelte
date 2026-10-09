@@ -27,9 +27,10 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 360, draw);
+	// narrow: the plan view sits above the rear view; the plan keeps one scale bar
+	useStage(() => canvas, { W: 880, H: 360, narrowH: () => 460 }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const rad = (d: number) => (d * Math.PI) / 180;
@@ -37,7 +38,10 @@
 		const ph = rad(phi);
 
 		// plan view, to scale: arcs for this lean and for 45 degrees, from a common entry
-		const ox = 60, oy = H - 50, pxm = 26; // px per metre
+		const ox = narrow ? 50 : 60, oy = narrow ? 236 : H - 50;
+		const Rmax = Math.max(R(45), R(lean));
+		// px per metre; narrow, shrink so the larger arc fits (still to scale, the bar follows)
+		const pxm = narrow ? Math.min(26, (W - ox - 70) / Rmax, (oy - 40) / (Rmax * (ph > Math.PI / 2 ? 2 : 1))) : 26;
 		const arc = (r: number, style: string, width: number, text: string) => {
 			ctx.strokeStyle = style;
 			ctx.lineWidth = width;
@@ -50,11 +54,11 @@
 			}
 			ctx.stroke();
 			const xe = ox + r * Math.sin(ph) * pxm, ye = oy - (r - r * Math.cos(ph)) * pxm;
-			label(ctx, COL, text, Math.min(xe + 8, 440), Math.max(ye, 20), style);
+			label(ctx, COL, text, Math.min(xe + 8, narrow ? W - 96 : 440), Math.max(ye, 20), style);
 		};
 		ctx.save();
 		ctx.beginPath();
-		ctx.rect(0, 0, 470, H);
+		ctx.rect(0, 0, narrow ? W : 470, narrow ? oy + 50 : H);
 		ctx.clip();
 		arc(R(45), COL.a(COL.tealHi, 0.45), 1.2, `45°: R ${fmt(R(45), 1)} m`);
 		arc(R(lean), COL.teal, 2.4, `${fmt(lean, 0)}°: R ${fmt(R(lean), 1)} m`);
@@ -69,13 +73,13 @@
 		label(ctx, COL, '5 m', ox + 2.5 * pxm, oy + 44, COL.muted, 'center');
 
 		// rear view: board rolled at the lean, N along the body
-		const cx = 640, cy = 220;
+		const cx = narrow ? W / 2 : 640, cy = narrow ? 392 : 220, half = narrow ? Math.min(140, W / 2 - 16) : 140;
 		const l = rad(lean);
 		ctx.strokeStyle = COL.teal;
 		ctx.lineWidth = 1.4;
 		ctx.beginPath();
-		ctx.moveTo(cx - 140, cy + 40);
-		ctx.lineTo(cx + 140, cy + 40);
+		ctx.moveTo(cx - half, cy + 40);
+		ctx.lineTo(cx + half, cy + 40);
 		ctx.stroke();
 		ctx.strokeStyle = COL.accent;
 		ctx.lineWidth = 5;
@@ -84,19 +88,19 @@
 		ctx.moveTo(cx - 40 * Math.cos(l), cy + 40 + 40 * Math.sin(l));
 		ctx.lineTo(cx + 40 * Math.cos(l), cy + 40 - 40 * Math.sin(l));
 		ctx.stroke();
-		const bodyLen = 120;
+		const bodyLen = narrow ? 96 : 120;
 		arrow(ctx, cx, cy + 40, cx - bodyLen * Math.sin(l), cy + 40 - bodyLen * Math.cos(l), COL.gold, 2);
 		label(ctx, COL, `N = ${fmt(1 / Math.cos(l), 2)} Mg`, cx - bodyLen * Math.sin(l) - 4, cy + 30 - bodyLen * Math.cos(l), COL.gold, 'right');
 		ctx.strokeStyle = COL.muted;
 		ctx.setLineDash([3, 4]);
 		ctx.beginPath();
 		ctx.moveTo(cx, cy + 40);
-		ctx.lineTo(cx, cy - 90);
+		ctx.lineTo(cx, cy + 40 - bodyLen - 10);
 		ctx.stroke();
 		ctx.setLineDash([]);
-		label(ctx, COL, `lean ${fmt(lean, 0)}°`, cx + 8, cy - 70, COL.muted);
-		label(ctx, COL, 'REAR VIEW', cx + 140, 30, COL.muted, 'right');
-		label(ctx, COL, 'PLAN VIEW, TO SCALE', 440, 30, COL.muted, 'right');
+		label(ctx, COL, `lean ${fmt(lean, 0)}°`, cx + 8, cy + 40 - bodyLen + 10, COL.muted);
+		label(ctx, COL, 'REAR VIEW', narrow ? W - 8 : cx + 140, narrow ? 300 : 30, COL.muted, 'right');
+		label(ctx, COL, 'PLAN VIEW, TO SCALE', narrow ? W - 8 : 440, narrow ? 16 : 30, COL.muted, 'right');
 
 		const r = R(lean);
 		const N = (M * G) / Math.cos(l);

@@ -9,7 +9,7 @@
 	import Frame from './Frame.svelte';
 	import Slider from './Slider.svelte';
 	import { clamp, fmt, breakerHeight, breakDepth, iribarren, breakerType } from './physics';
-	import { label, dot } from './plot';
+	import { label, dot, fitLabel } from './plot';
 	import { useStage, useLoop } from './use-stage.svelte';
 	import { DEFAULT_SWELL, type SwellProps } from './types';
 	import type { Stage } from './stage';
@@ -35,7 +35,7 @@
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
 	// the loop draws while playing; when paused, redraw on input
-	const st = useStage(() => canvas, 880, 360, (s) => {
+	const st = useStage(() => canvas, { W: 880, H: 360, narrowH: (w) => Math.max(300, w * 0.85) }, (s) => {
 		if (!playing) draw(s);
 	});
 	let last = 0;
@@ -46,7 +46,7 @@
 		draw(s);
 	});
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const level = (range / 2) * Math.cos((2 * Math.PI * hour) / PERIOD); // high water at hour 0
@@ -58,7 +58,7 @@
 
 		// cross-section, offshore left, beach right; x seaward distance 0..xMax
 		const xMax = 260, dTop = -3, dBot = 7;
-		const left = 40, right = W - 30, top = 30, bot = H - 70;
+		const left = narrow ? 8 : 40, right = W - (narrow ? 8 : 30), top = 30, bot = H - 70;
 		const PX = (x: number) => right - (x / xMax) * (right - left);
 		const PY = (d: number) => top + ((d - dTop) / (dBot - dTop)) * (bot - top); // d positive down
 		// bed
@@ -113,10 +113,10 @@
 		ctx.lineTo(PX(xb), PY(hb - level + 0));
 		ctx.stroke();
 		dot(ctx, PX(xb), PY(-level) - 4, 5, COL.accent);
-		label(ctx, COL, `h_b = ${fmt(hb, 1)} m`, PX(xb) + 8, PY(-level / 2 + hb / 2), COL.accent);
+		fitLabel(ctx, COL, `h_b = ${fmt(hb, 1)} m`, PX(xb) + 4, PY(-level / 2 + hb / 2), COL.accent, right);
 		label(ctx, COL, `${breakerType(xi)}`, PX(xb), PY(-level) - 14, COL.accent, 'center');
 		// tide clock
-		const cx = 70, cy = H - 30, r = 16;
+		const cx = narrow ? 26 : 70, cy = H - 30, r = 16;
 		ctx.strokeStyle = COL.muted;
 		ctx.beginPath();
 		ctx.arc(cx, cy, r, 0, 7);
@@ -126,8 +126,8 @@
 		ctx.moveTo(cx, cy);
 		ctx.lineTo(cx + r * Math.cos(ang), cy + r * Math.sin(ang));
 		ctx.stroke();
-		label(ctx, COL, `${fmt(hour, 1)} h after high water, level ${level >= 0 ? '+' : ''}${fmt(level, 2)} m`, cx + 26, cy + 4, COL.muted);
-		label(ctx, COL, 'scale: 260 m across, depth ×' + fmt((bot - top) / (dBot - dTop) / ((right - left) / xMax), 0), right, H - 26, COL.muted, 'right');
+		label(ctx, COL, `${fmt(hour, 1)} h after high${narrow ? ',' : ' water,'} level ${level >= 0 ? '+' : ''}${fmt(level, 2)} m`, cx + 26, cy + 4, COL.muted);
+		if (!narrow) label(ctx, COL, 'scale: 260 m across, depth ×' + fmt((bot - top) / (dBot - dTop) / ((right - left) / xMax), 0), right, H - 26, COL.muted, 'right');
 
 		readout =
 			`H₀=<b>${fmt(H0, 1)} m</b> at <b>${fmt(T, 0)} s</b> → H<sub>b</sub>=<b>${fmt(Hb, 2)} m</b>, needs h<sub>b</sub>=1.28H<sub>b</sub>=<b>${fmt(hb, 2)} m</b>` +

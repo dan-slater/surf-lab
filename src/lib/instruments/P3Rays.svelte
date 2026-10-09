@@ -63,7 +63,7 @@
 		return { nx, ny, dx, dy, dist };
 	});
 
-	useStage(() => canvas, 880, 700, schedule);
+	useStage(() => canvas, { W: 880, H: 700, narrowH: (w) => w * 1.55 }, schedule);
 	let raf = 0;
 	function schedule(s: Stage) {
 		// read the reactive inputs here so the stage effect tracks them
@@ -73,13 +73,13 @@
 	}
 	$effect(() => () => cancelAnimationFrame(raf));
 
-	function draw({ ctx, W, H, col: COL }: Stage, a: { dirFrom: number; T: number; mode: number; g: typeof grid; C: [number, number][]; sections: { name: string; x: number; y: number }[]; dom: Domain }) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage, a: { dirFrom: number; T: number; mode: number; g: typeof grid; C: [number, number][]; sections: { name: string; x: number; y: number }[]; dom: Domain }) {
 		const { dirFrom, T, mode, C } = a;
 		const { xm, ym } = a.dom;
 		const { nx, ny, dx, dy, dist } = a.g;
 		// domain (metres)
 		const s = Math.min(W*0.7/(xm[1]-xm[0]), H/(ym[1]-ym[0]));
-		const ox = 170 - xm[0]*s, oy = H - 10 + ym[0]*s;
+		const ox = (narrow ? W*0.17 : 170) - xm[0]*s, oy = H - 10 + ym[0]*s;
 		const P=(x: number,y: number): [number, number]=>[ox+x*s, oy-y*s];
 		function depthOf(sd: number){ return sd<=0 ? 0 : (sd<=250 ? sd/25 : 10+(sd-250)/70); }
 		function sampleDist(x: number,y: number){
@@ -175,12 +175,12 @@
 			}
 		}
 		// sections
-		ctx.font=COL.font(10.5);
+		ctx.font=COL.font(narrow ? 9 : 10.5);
 		a.sections.forEach(sec=>{
 			const q=P(sec.x,sec.y);
 			ctx.fillStyle=COL.gold; ctx.beginPath(); ctx.arc(q[0],q[1],2.5,0,7); ctx.fill();
 			ctx.fillStyle=sec.name==="Supertubes"?COL.foam:COL.muted;
-			ctx.fillText(sec.name.toUpperCase(), q[0]+10, q[1]+3);
+			ctx.fillText(narrow ? sec.name : sec.name.toUpperCase(), q[0]+(narrow?6:10), q[1]+3);
 		});
 		const c30=phaseSpeed(T,30), c10=phaseSpeed(T,10), c3=phaseSpeed(T,3);
 		const share = focus.total? focus.n/focus.total : 0;

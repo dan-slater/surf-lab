@@ -21,7 +21,7 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	const st = useStage(() => canvas, 880, 300, (s) => draw(s));
+	const st = useStage(() => canvas, { W: 880, H: 300, narrowH: (w) => Math.max(230, w * 0.66) }, (s) => draw(s));
 
 	const N=500, L=1500, dxm=L/N;
 	const zb=new Float32Array(N), h=new Float32Array(N), hu=new Float32Array(N);
@@ -82,7 +82,7 @@
 		for(let i=0;i<N;i++){ if(h[i]>1e-4){ const u=Math.abs(hu[i]/h[i])+Math.sqrt(G*h[i]); if(u>m)m=u; } }
 		return 0.45*dxm/m;
 	}
-	function draw({ ctx, W, H: Hc, col: COL }: Stage){
+	function draw({ ctx, W, H: Hc, col: COL, narrow }: Stage){
 		ctx.fillStyle=COL.ink; ctx.fillRect(0,0,W,Hc);
 		const x2px=W/N, zScale=16, sl=Hc*0.42;   // SWL line y; bed drawn compressed (×0.42)
 		// bed
@@ -109,9 +109,9 @@
 		}
 		ctx.globalAlpha=1;
 		ctx.font=COL.font(10.5); ctx.fillStyle=COL.muted;
-		ctx.fillText("offshore −20 m", 10, sl+120);
+		ctx.fillText("offshore −20 m", 10, narrow ? Hc-10 : sl+120);
 		ctx.fillText("beach", W-56, sl-30);
-		ctx.fillText("t = "+fmt(t,0)+" s (×"+simSpeed+")", W-130, 20);
+		ctx.fillText("t = "+fmt(t,0)+" s (×"+simSpeed+")", W-(narrow?110:130), 20);
 	}
 
 	// restart whenever height or period change, as the original sliders did

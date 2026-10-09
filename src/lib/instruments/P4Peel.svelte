@@ -20,12 +20,12 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	const st = useStage(() => canvas, 880, 380, () => {});
+	const st = useStage(() => canvas, { W: 880, H: 380, narrowH: (w) => Math.max(300, w * 0.95) }, () => {});
 	let t=0, last=performance.now();
 	const VMAX=11;
 	useLoop(() => st.stage, frame);
 
-	function frame({ ctx, W, H, col: COL }: Stage, now: number){
+	function frame({ ctx, W, H, col: COL, narrow }: Stage, now: number){
 		const dt=clamp((now-last)/1000,0,0.05); last=now; t+=dt;
 		const alpha=alphaDeg*Math.PI/180;
 		const Vp=c/Math.sin(alpha), w=c/Math.tan(alpha);
@@ -38,7 +38,7 @@
 		ctx.strokeStyle=COL.a(COL.coast,0.5); ctx.beginPath(); ctx.moveTo(0,34); ctx.lineTo(W,34); ctx.stroke();
 		ctx.font=COL.font(10.5); ctx.fillStyle=COL.muted; ctx.fillText("SHORE", 12, 22);
 		const y0=H-46, crestY=y0-c*tt*S;                 // crest advances up
-		const xb0=90, xb=xb0+w*tt*S;                     // breakpoint moves right
+		const xb0=narrow?30:90, xb=xb0+w*tt*S;                     // breakpoint moves right
 		// whitewater wedge: everything left of historical breakpoints
 		ctx.fillStyle=COL.a(COL.foam,0.14);
 		ctx.beginPath();

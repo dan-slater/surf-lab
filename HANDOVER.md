@@ -1,59 +1,54 @@
 # surf-lab — HANDOVER
 
-> ## BOOK LINE (build-order step 5), 2026-10-09: the book is built, 9 chapters prerender with maths, 21 instruments swap on scroll
+> ## BOOK LINE (build-order step 5), 2026-10-09: book done; instruments now reflow to 360 px; direction reads deep-water
 >
 > **Built (branch `book`, worktree `~/code/surf-lab-book`):** `/book` (contents, nine ledes) and
-> `/book/[chapter]` (text left; the section's instrument pinned right and swapped as you scroll by
-> IntersectionObserver on the section headings; a picker overrides it, "follow" resumes; a swell
-> strip (Hs, Tp, direction) drives every instrument; under 1100 px each section gets its instrument
-> as an inline figure, mounted lazily). All chapter fields are rendered: title, lede, sections
-> (body, "on the wave", figure brief in a fold), key equations with meaning and worked example,
-> references with "why read it", revision notes in a fold. `[n]` markers link to the references,
-> `#slug` links become chapter routes. `/book/instruments` shows all 21 at once.
+> `/book/[chapter]`: text left, the section's instrument pinned right and swapped on scroll
+> (IntersectionObserver on section headings), a picker to override and "follow" to resume, a
+> swell strip (Hs, Tp, direction) that drives every instrument. Under 1100 px each section gets its
+> instrument inline, mounted lazily. All chapter fields render (lede, body, on the wave, figure
+> brief, key equations with worked examples, references with why-read-it, revision notes); `[n]`
+> links to the references, `#slug` to chapter routes. `/book/instruments` shows all 21.
 > `scripts/sync-content.mjs` copies `$SURF_BOOK_DIR` (default `~/surf-physics-book/chapters`) into
-> `content/chapters/` (git-ignored), checks all nine parse, fails loudly otherwise; wired as
-> `predev` and `prebuild` (bun runs both). Type: Libertinus Serif via `@fontsource`, labels in
-> Spline Sans Mono, palette as CSS tokens in `src/routes/book/tokens.css`.
+> git-ignored `content/chapters/`, fails loudly if missing; wired as `predev` and `prebuild`.
+> KaTeX renders at BUILD time on the raw strings (`src/routes/book/math.ts`) because `breaking`
+> and `swell` hold bare `\(u < c\)` / `\(h > L/2\)` that client auto-render cannot survive; no KaTeX
+> JS ships. Libertinus Serif for prose (Libertinus Math unused: KaTeX cannot take it).
 >
-> **Maths:** KaTeX `renderToString` at BUILD time on the raw JSON strings (`src/routes/book/math.ts`),
-> not client auto-render: `breaking` and `swell` hold bare `\(u < c\)` and `\(h > L/2\)` inside
-> `body_html`, which an HTML parser mangles before auto-render can see them. Pages ship finished
-> maths and no KaTeX JS. Libertinus Math is unused: KaTeX cannot take an OpenType math font.
+> **Instruments (`src/lib/instruments/`, README there):** P1 to P6 lifted, maths and drawing code
+> unchanged (headless against the original: P1 and P3 readouts identical, P5 time step agrees).
+> Fifteen derived from their chapters' own equations; the tests reproduce the chapters' worked
+> examples. `instrumentFor(slug, i)` in `map.ts`.
+> - **Since the last block, phones:** below 600 CSS px every instrument reflows to the real width
+>   (logical width = CSS width, so labels keep their pixel size): two-panel figures stack, ticks
+>   thin, long labels shorten or drop, the J-Bay section strip wraps to two rows, readouts stack one
+>   item per line (container query). Maths identical. No sideways scrolling.
+> - **Direction:** every instrument, `Sim2D` included, takes the deep-water `dirDeg` (225° for
+>   J-Bay). `Sim2D` converts with `generatorDirectionFor(deepWaterDeg, grid, depth)` in
+>   `direction.ts`, a J-Bay-only stand-in from Run A's pair (225° → 120°); when the sim line's
+>   `generatorDirection` lands, its body becomes one `return generatorDirection(...)` line.
+> - **Peel angles:** `SectionSpeed` keeps 45° per J-Bay section; its caption says this is a
+>   placeholder until the sim measures them.
+> - **State hook:** `src/routes/book/[chapter]/+page.svelte`, comment `HOOK(app state)`: replace
+>   the local `swell` $state with the store (one line) and drop the swell strip.
 >
-> **Instruments (`src/lib/instruments/`, README there):** P1 to P6 lifted with the maths and drawing
-> code unchanged (colours and fonts to tokens only; P6 lost the "v0 was this" dot and gained an
-> `onPeel` backdrop). Rendered headless against the original page at the same inputs, P1 and P3
-> readouts are identical and P5's time step agrees. Fifteen derived ones, each from equations its
-> chapter states: swell arrival/sets, swell power and reach, Iribarren, the 2-D sim (WebGPU,
-> `createSolver` + debug renderer on J-Bay, captured frame as fallback), catching gap, refraction,
-> tide, rip pulses, height statistics, effective flow, section speed (J-Bay's sections), face
-> acceleration, banked turn, board planing, fin lift. `instrumentFor(slug, i)` in `map.ts`
-> returns `{id, caption, props?}[]`. Each takes `{Hs, Tp, dirDeg, spot?}`; default J-Bay 2.5 m,
-> 15 s, from 225°; the day chapter opens on its own worked swell (1.5 m, 14 s).
-> **State hook:** `src/routes/book/[chapter]/+page.svelte`, comment `HOOK(app state)`: replace the
-> local `swell` $state with the app line's store (one line) and drop the swell strip.
->
-> **Works, with evidence:** `bun run check` 0 errors, 0 warnings; `bun test` 27 pass (11 sim + 16
-> book: worked examples from five chapters reproduce, e.g. H_b 2.28 m, ξ₀ 0.41/1.24, R 6.5/3.8 m;
-> the renderer keeps `u < c` out of the HTML); `bun run build` prerenders `/book`, nine chapters
-> and `/book/instruments`, 213 KaTeX blocks, 0 `katex-error`, 0 leftover delimiters. Headless
-> Chromium (sim line's `scripts/browser.ts`, 4090 Vulkan) via `bun scripts/shoot-instruments.ts`:
-> one screenshot per instrument in `docs/img/instruments/`, page shots in `docs/img/book/`; the
-> bench on `/book/breaking` swaps P1 → P3 → P2 → Iribarren → P4 while scrolling; the 2-D sim runs
-> live (`docs/img/instruments/sim.png`). Only console noise: `/favicon.ico` 404 (site-wide).
+> **Works, with evidence:** `bun run check` 0 errors 0 warnings; `bun test` 27 pass (11 sim, 16
+> book); `bun run build` prerenders `/book`, nine chapters, `/book/instruments`: 213 KaTeX blocks,
+> 0 errors, 0 leftover delimiters. `bun scripts/shoot-instruments.ts` (headless Chrome on the 4090
+> via the sim line's `scripts/browser.ts`): every instrument at desktop (`docs/img/instruments/<id>.png`)
+> and at 360 and 390 px (`<id>-360.png`, `<id>-390.png`), with an assertion of **no horizontal
+> overflow at 360 or 390 px** (passes for all 21); the bench on `/book/breaking` swaps P1 → P3 →
+> P2 → Iribarren → P4 while scrolling; the 2-D sim runs live (readout "deep water from 225°, 120° at
+> the wavemaker"). Page shots in `docs/img/book/`. Console noise: only `/favicon.ico` 404 (app line).
 > Dev server: tmux `surflab-book`, `http://127.0.0.1:5183/book`.
 >
-> **Open questions:** (1) swell direction has two meanings: P3 and the book use the REGIONAL
-> deep-water direction (SW, 225°), the solver uses the LOCAL wavemaker direction (Run A, 120°);
-> `Sim2D` takes its own `localDirDeg` so the book's 225° does not point the wavemaker offshore. The
-> app store needs to say which it carries. (2) Per-section peel angles at J-Bay are not in the
-> review; `SectionSpeed` starts each section at 45° for the reader to set, until the 2-D sim
-> breaks and can measure them. (3) Canvases keep their research-notes logical sizes (880 wide);
-> on phones they scroll sideways at a 600 px minimum rather than reflow. (4) `favicon.ico` is
-> missing site-wide (static/ is the app line's).
+> **Open questions:** (1) this branch still has the first-order sim; main now has MUSCL + RK2, so
+> `Sim2D`'s caption ("does not break here yet") needs revisiting after merge. (2) The direction
+> stand-in assumes Run A's 105° turn holds across J-Bay's whole swell window.
 >
-> **Next for this line:** bind the state hook when `#lib/state` lands; reflowing phone layouts for
-> the widest instruments; draw the chapters' figure briefs (`diagram_spec`) as static SVG figures.
+> **Next for this line:** swap in `generatorDirection` when it lands; bind the state hook when
+> `#lib/state` lands; re-caption `Sim2D` against the MUSCL solver; draw the chapters' figure briefs
+> as static SVG.
 
 > ## SIM LINE (build-order step 2), 2026-10-09: module built, bathy exact, wave parity FAILS by design of first order
 >

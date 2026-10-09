@@ -19,8 +19,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
-		min-width: 150px;
-		flex: 1 1 150px;
+		min-width: 130px;
+		flex: 1 1 130px;
 		max-width: 240px;
 	}
 	.lab {

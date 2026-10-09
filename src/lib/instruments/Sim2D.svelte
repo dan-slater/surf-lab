@@ -1,10 +1,10 @@
 <!--
 	The 2-D shallow-water solver (src/lib/sim, owned by the sim line) running on
 	J-Bay in a small canvas, painted by its debug renderer. Without WebGPU it
-	shows a captured frame instead. The solver's swell direction is the LOCAL
-	one at the wavemaker (Run A: from 120 deg, after the regional SW swell has
-	wrapped Cape St Francis), so it takes its own `localDirDeg` rather than the
-	book's regional dirDeg.
+	shows a captured frame instead. It reads the deep-water dirDeg like every
+	other instrument and converts it to the wavemaker's local direction with
+	generatorDirectionFor (direction.ts), a stand-in for the sim line's
+	generatorDirection until that lands.
 -->
 <script lang="ts">
 	import Frame from './Frame.svelte';
@@ -17,8 +17,12 @@
 	import { requestDevice } from '#lib/sim/gpu.ts';
 	import { JBAY, JBAY_GRID, JBAY_RUN_A_SWELL } from '#lib/spots/jbay.ts';
 	import fallbackFrame from './assets/sim-jbay-t390.png';
+	import { generatorDirectionFor } from './direction';
 
-	let { Hs = DEFAULT_SWELL.Hs, Tp = DEFAULT_SWELL.Tp, localDirDeg = JBAY_RUN_A_SWELL.dirDeg, warm = 240 }: SwellProps & { localDirDeg?: number; warm?: number } = $props();
+	let { Hs = DEFAULT_SWELL.Hs, Tp = DEFAULT_SWELL.Tp, dirDeg = DEFAULT_SWELL.dirDeg, warm = 240 }: SwellProps & { warm?: number } = $props();
+
+	const { depth } = bathyFromPolyline(JBAY.coast, JBAY_GRID);
+	const localDirDeg = $derived(generatorDirectionFor(dirDeg, JBAY_GRID, depth));
 
 	let H = $state(2.5);
 	let T = $state(15);
@@ -43,7 +47,6 @@
 		(async () => {
 			const { device } = await requestDevice();
 			if (!alive) return;
-			const { depth } = bathyFromPolyline(JBAY.coast, JBAY_GRID);
 			cv.width = JBAY_GRID.ny * 2;
 			cv.height = JBAY_GRID.nx * 2;
 			solver = createSolver(device, {
@@ -88,7 +91,7 @@
 
 	const readout = $derived(
 		status === 'running'
-			? `J-Bay, ${JBAY_GRID.nx} × ${JBAY_GRID.ny} cells at ${JBAY_GRID.dx} m · model time <b>${fmt(modelTime, 0)} s</b> · swell from ${fmt(localDirDeg, 0)}° at the wavemaker`
+			? `J-Bay, ${JBAY_GRID.nx} × ${JBAY_GRID.ny} cells at ${JBAY_GRID.dx} m · model time <b>${fmt(modelTime, 0)} s</b> · deep water from ${fmt(dirDeg, 0)}°, ${fmt(localDirDeg, 0)}° at the wavemaker`
 			: status === 'starting'
 				? 'starting the WebGPU solver…'
 				: `WebGPU unavailable (${reason}); showing a captured frame at t = 390 s`

@@ -21,7 +21,9 @@
 	$effect.pre(() => { playing = play; });
 
 	let canvas = $state<HTMLCanvasElement>();
-	const st = useStage(() => canvas, 880, 360, () => {});
+	// narrow: the rig scene is scaled to the width and the small-scale strip moves below it
+	const SCENE_W = 545, SCENE_TOP = 60, SCENE_H = 250;
+	const st = useStage(() => canvas, { W: 880, H: 360, narrowH: (w) => (w * SCENE_H) / SCENE_W + 110 }, () => {});
 
 	const names=["paddle","pop-up","trim","bottom turn","top turn","tube"];
 	// pose params: hips {x,y} rel board centre; torso angle (deg from vertical, +forward);
@@ -130,7 +132,7 @@
 	let t=0, last=performance.now();
 	let label = $state('trim');
 	useLoop(() => st.stage, (s, now) => {
-		const { ctx, W, H, col: COL } = s;
+		const { ctx, W, H, col: COL, narrow } = s;
 		const dt=clamp((now-last)/1000,0,0.05); last=now;
 		if (playing){ t+=dt*0.55; poseU=+((t)%5.999).toFixed(3); }
 		const u=poseU;
@@ -139,6 +141,8 @@
 		const next = f<0.15? names[i] : (f>0.85? names[Math.min(i+1,5)] : names[i]+" → "+names[Math.min(i+1,5)]);
 		if (next !== label) label = next;
 		ctx.fillStyle=COL.ink; ctx.fillRect(0,0,W,H);
+		const k = W/SCENE_W;
+		if (narrow){ ctx.save(); ctx.translate(0,-SCENE_TOP*k); ctx.scale(k,k); }
 		if (onPeel){
 			// the peel front: unbroken face ahead (right), whitewater trailing behind (left)
 			ctx.fillStyle=COL.a(COL.foam,0.12);
@@ -146,20 +150,27 @@
 			ctx.strokeStyle=COL.a(COL.foam,0.6); ctx.lineWidth=2; ctx.setLineDash([5,4]);
 			ctx.beginPath(); ctx.moveTo(150,300); ctx.lineTo(214,170); ctx.stroke(); ctx.setLineDash([]);
 			ctx.font=COL.font(10); ctx.fillStyle=COL.muted;
-			ctx.fillText("WHITEWATER", 24, 230); ctx.fillText("UNBROKEN FACE", 400, 170);
+			if (!narrow){ ctx.fillText("WHITEWATER", 24, 230); ctx.fillText("UNBROKEN FACE", 400, 170); }
 		}
 		// wave face suggestion behind big rig
 		ctx.strokeStyle=COL.a(COL.teal,0.35); ctx.lineWidth=2;
 		ctx.beginPath();
-		for(let x=0;x<=W*0.62;x+=8){ const y=252 - 66*Math.exp(-Math.pow((x-238)/150,2)); x?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+		for(let x=0;x<=(narrow?SCENE_W:W*0.62);x+=8){ const y=252 - 66*Math.exp(-Math.pow((x-238)/150,2)); x?ctx.lineTo(x,y):ctx.moveTo(x,y); }
 		ctx.stroke();
 		drawSurfer(s, pose, 300, 236, 1.35, pose.prone?t*6:null, 3);
+		if (narrow) ctx.restore();
 		// LOD strip: all key poses tiny
 		ctx.font=COL.font(10);
-		ctx.fillStyle=COL.muted; ctx.fillText("AT BACKGROUND SCALE:", 560, 96);
-		for(let k=0;k<6;k++){
-			drawSurfer(s, POSES[k], 575+k*48, 150, 0.28, POSES[k].prone?t*6:null, 1.2);
-			ctx.fillStyle=COL.muted;
+		if (narrow){
+			const y0 = H-78;
+			ctx.fillStyle=COL.muted; ctx.fillText("AT BACKGROUND SCALE:", 12, y0);
+			for(let j=0;j<6;j++) drawSurfer(s, POSES[j], 28+j*(W-56)/5, H-24, 0.28, POSES[j].prone?t*6:null, 1.2);
+		} else {
+			ctx.fillStyle=COL.muted; ctx.fillText("AT BACKGROUND SCALE:", 560, 96);
+			for(let j=0;j<6;j++){
+				drawSurfer(s, POSES[j], 575+j*48, 150, 0.28, POSES[j].prone?t*6:null, 1.2);
+				ctx.fillStyle=COL.muted;
+			}
 		}
 	});
 </script>

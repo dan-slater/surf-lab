@@ -6,8 +6,25 @@ Interactive canvas figures that sit beside the Surf Physics Review text
 direction the swell comes from, and an ENU spot; J-Bay, 2.5 m, 15 s, 225° by
 default) plus a few optional extras from its chapter's worked numbers.
 
-Screenshots of every instrument: [`docs/img/instruments/`](../../../docs/img/instruments/).
-All of them on one page: `/book/instruments`.
+Screenshots of every instrument: [`docs/img/instruments/`](../../../docs/img/instruments/)
+(`<id>.png` desktop, `<id>-360.png` and `<id>-390.png` phone widths). All of
+them on one page: `/book/instruments`.
+
+**Direction.** `dirDeg` is always the deep-water compass direction (J-Bay
+225°), as the app store will carry it. Only `Sim2D` needs the wavemaker's local
+direction; it converts with `generatorDirectionFor` in `direction.ts`, a
+J-Bay-only stand-in (Run A's 225° → 120°) with the same signature as the sim
+line's coming `generatorDirection(deepWaterDeg, grid, depth)`. Swapping it in
+is a one-line change in that file.
+
+**Reflow.** From 600 CSS px up an instrument draws at its design size (880 wide)
+scaled to fit. Below 600 the logical width is the real CSS width, so 10 px
+labels stay 10 px, and each instrument has a narrow layout: two-panel figures
+stack, tick marks thin out, long labels shorten or drop, the J-Bay section strip
+wraps to two rows. Readouts stack one item per line when the card is under
+560 px (a container query in `Frame.svelte`). The maths is identical in both
+layouts. `scripts/shoot-instruments.ts` checks there is no horizontal overflow
+at 360 and 390 px.
 
 ## Lifted from the research notes
 
@@ -15,7 +32,9 @@ All of them on one page: `/book/instruments`.
 the maths and drawing code unchanged (same expressions, same logical canvas
 size); only colours and fonts were moved to CSS tokens and the DOM sliders to
 Svelte state. Rendered headless against the original at the same inputs, P1
-and P3 give identical readouts and P5 the same time step.
+and P3 give identical readouts and P5 the same time step. Their narrow layouts
+move margins and labels only (P6 scales its rig scene and puts the small-scale
+strip underneath).
 
 | file | what |
 |---|---|
@@ -64,9 +83,10 @@ against the chapters' worked examples.
   `{ id, caption, props? }` (first is shown, the rest are tabs; empty keeps the
   previous instrument), `instrumentsInChapter(slug)` for the picker, and
   `CHAPTER_SWELL` for chapters whose worked examples share one swell.
-- `stage.ts`, `use-stage.svelte.ts`: a fixed logical canvas size scaled to the
-  CSS width times devicePixelRatio, redrawn on resize, DPR change and any
-  reactive input; animation loops pause off screen.
+- `stage.ts`, `use-stage.svelte.ts`: the design size, or the narrow layout
+  under 600 px (`{ W, H, narrowH(w) }`), backed at devicePixelRatio, redrawn on
+  resize, DPR change and any reactive input; animation loops pause off screen.
+- `direction.ts`: deep-water to wavemaker direction (stand-in, see above).
 - `palette.ts`: colours and the mono face from CSS custom properties
   (`--ink`, `--teal`, `--coral`, ...; see `src/routes/book/tokens.css`).
 - `Frame.svelte`, `Slider.svelte`, `plot.ts`: the card, a labelled range, and

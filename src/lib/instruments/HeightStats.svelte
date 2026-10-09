@@ -9,7 +9,7 @@
 	import Frame from './Frame.svelte';
 	import Slider from './Slider.svelte';
 	import { clamp, fmt, breakerHeight } from './physics';
-	import { axes, curve, label, vline } from './plot';
+	import { axes, curve, fitLabel, vline } from './plot';
 	import { useStage } from './use-stage.svelte';
 	import { DEFAULT_SWELL, type SwellProps } from './types';
 	import type { Stage } from './stage';
@@ -26,9 +26,9 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 340, draw);
+	useStage(() => canvas, { W: 880, H: 340, narrowH: (w) => Math.max(300, w * 0.9) }, draw);
 
-	function draw({ ctx, W, H: Hc, col: COL }: Stage) {
+	function draw({ ctx, W, H: Hc, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, Hc);
 		const m0 = (H / 4.004) ** 2;
@@ -40,8 +40,8 @@
 		const Hrms = H / Math.SQRT2;
 		const xMax = Math.max(2.6 * H, cap * 1.1);
 		const yMax = pdf(2 * Math.sqrt(m0)) * 1.15; // pdf peaks at h = 2 sqrt(m0)
-		const A = axes(ctx, COL, { x: 60, y: 20, w: W - 100, h: Hc - 70 }, [0, xMax], [0, yMax], {
-			xTicks: Array.from({ length: Math.floor(xMax / 0.5) + 1 }, (_, i) => i * 0.5),
+		const A = axes(ctx, COL, { x: narrow ? 46 : 60, y: 20, w: W - (narrow ? 56 : 100), h: Hc - 70 }, [0, xMax], [0, yMax], {
+			xTicks: Array.from({ length: Math.floor(xMax / (narrow ? 1 : 0.5)) + 1 }, (_, i) => i * (narrow ? 1 : 0.5)),
 			xFmt: (v) => fmt(v, 1),
 			xLabel: 'individual wave height [m]',
 			yLabel: 'how often'
@@ -59,12 +59,12 @@
 		curve(ctx, A, pdf, COL.teal, 2);
 		const mark = (x: number, color: string, text: string, y: number) => {
 			vline(ctx, A, x, color);
-			label(ctx, COL, text, A.X(x) + 5, y, color);
+			fitLabel(ctx, COL, text, A.X(x), y, color, A.box.x + A.box.w);
 		};
 		mark(Hrms, COL.muted, `H_rms ${fmt(Hrms, 2)}`, 34);
 		mark(H, COL.tealHi, `H_s ${fmt(H, 2)}`, 50);
-		mark(Hmax, COL.gold, `biggest of ${fmt(N, 0)}: ${fmt(Hmax, 2)}`, 66);
-		if (cap < xMax) mark(cap, COL.accent, `depth cap 0.75 d = ${fmt(cap, 2)}`, 82);
+		mark(Hmax, COL.gold, narrow ? `max of ${fmt(N, 0)} ${fmt(Hmax, 2)}` : `biggest of ${fmt(N, 0)}: ${fmt(Hmax, 2)}`, 66);
+		if (cap < xMax) mark(cap, COL.accent, narrow ? `cap 0.75 d ${fmt(cap, 2)}` : `depth cap 0.75 d = ${fmt(cap, 2)}`, 82);
 
 		const Hb = breakerHeight(H, T);
 		readout =

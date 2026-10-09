@@ -25,16 +25,16 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 320, draw);
+	useStage(() => canvas, { W: 880, H: 320, narrowH: (w) => Math.max(280, w * 0.85) }, draw);
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const uc = eta * Math.sqrt(G / channel);
 		const us = eta * Math.sqrt(G / shoal);
 		const span = 600;
-		const A = axes(ctx, COL, { x: 60, y: 20, w: W - 100, h: H - 80 }, [0, span], [0, 2.5], {
-			xTicks: [0, 100, 200, 300, 400, 500, 600],
+		const A = axes(ctx, COL, { x: narrow ? 46 : 60, y: 20, w: W - (narrow ? 56 : 100), h: H - 80 }, [0, span], [0, 2.5], {
+			xTicks: narrow ? [0, 200, 400, 600] : [0, 100, 200, 300, 400, 500, 600],
 			yTicks: [0, 0.5, 1, 1.5, 2, 2.5],
 			xLabel: 'time [s]',
 			yLabel: 'speed [m/s]'
@@ -56,9 +56,9 @@
 		series(us, 0, COL.a(COL.gold, 0.6), 1.2, [4, 4]);
 		series(uc, 0, COL.teal, 2);
 		series(uc, 1, COL.accent, 1.6);
-		label(ctx, COL, 'rip in the channel', A.X(span) - 4, A.Y(mean + uc) - 6, COL.teal, 'right');
-		label(ctx, COL, 'surge on the shoal beside it', A.X(span) - 4, A.Y(mean + us) - 6, COL.gold, 'right');
-		label(ctx, COL, 'you paddling 1 m/s in the channel, over the ground', A.X(span) - 4, A.Y(1 + mean + uc) - 6, COL.accent, 'right');
+		label(ctx, COL, narrow ? 'channel' : 'rip in the channel', A.X(span) - 4, A.Y(mean + uc) + (narrow ? 14 : -6), COL.teal, 'right');
+		label(ctx, COL, narrow ? 'shoal' : 'surge on the shoal beside it', A.X(span) - 4, A.Y(mean + us) - 6, COL.gold, 'right');
+		label(ctx, COL, narrow ? 'you, paddling 1 m/s' : 'you paddling 1 m/s in the channel, over the ground', A.X(span) - 4, A.Y(1 + mean + uc) - 6, COL.accent, 'right');
 
 		readout =
 			`U<sub>rms,ig</sub> = η√(g/h): channel ${fmt(channel, 1)} m → <b>${fmt(uc, 2)} m/s</b>, shoal ${fmt(shoal, 1)} m → <b>${fmt(us, 2)} m/s</b>` +

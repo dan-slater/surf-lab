@@ -25,15 +25,16 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 340, draw);
+	// narrow: the lift-against-speed plot stacks under the C_L curve
+	useStage(() => canvas, { W: 880, H: 340, narrowH: () => 430 }, draw);
 
 	const RHO = 1025;
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
-		const A = axes(ctx, COL, { x: 60, y: 20, w: 480, h: H - 70 }, [0, 45], [0, 1], {
-			xTicks: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45],
+		const A = axes(ctx, COL, narrow ? { x: 44, y: 16, w: W - 56, h: 190 } : { x: 60, y: 20, w: 480, h: H - 70 }, [0, 45], [0, 1], {
+			xTicks: narrow ? [0, 10, 20, 30, 40] : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45],
 			yTicks: [0, 0.2, 0.4, 0.6, 0.8, 1],
 			xLabel: 'angle of attack [deg]',
 			yLabel: 'C_L',
@@ -46,16 +47,16 @@
 		curve(ctx, A, fall(0.87, 30), COL.teal, 1.4, [5, 4]);
 		curve(ctx, A, rise(0.7, 20), COL.gold, 1.8);
 		curve(ctx, A, fall(0.7, 20), COL.gold, 1.2, [5, 4]);
-		label(ctx, COL, 'quad, rear fins stock: 0.87 at 30°', A.X(29), A.Y(0.87) - 8, COL.teal, 'right');
-		label(ctx, COL, 'rear fins inboard: ~0.7 at 20°', A.X(19), A.Y(0.7) - 8, COL.gold, 'right');
-		label(ctx, COL, 'dashed: "lift collapses", shape not given', A.X(44), A.Y(0.12), COL.muted, 'right');
+		label(ctx, COL, narrow ? 'stock: 0.87 at 30°' : 'quad, rear fins stock: 0.87 at 30°', A.X(29), A.Y(0.87) - 8, COL.teal, 'right');
+		label(ctx, COL, narrow ? 'inboard: ~0.7 at 20°' : 'rear fins inboard: ~0.7 at 20°', A.X(19), A.Y(0.7) - 8, COL.gold, 'right');
+		label(ctx, COL, narrow ? 'dashed: shape not given' : 'dashed: "lift collapses", shape not given', A.X(44), A.Y(0.12), COL.muted, 'right');
 		ctx.fillStyle = COL.a(COL.teal, 0.08);
 		ctx.fillRect(A.X(0), A.box.y, A.X(5) - A.X(0), A.box.h);
 		label(ctx, COL, 'trim', A.X(2.5), A.box.y + 12, COL.muted, 'center', 9);
 		dot(ctx, A.X((CL / 0.87) * 30), A.Y(CL), 5, COL.accent);
 
 		// right: lift on the fin against speed, for the chosen C_L
-		const B = axes(ctx, COL, { x: 610, y: 20, w: W - 640, h: H - 70 }, [0, 14], [0, 800], {
+		const B = axes(ctx, COL, narrow ? { x: 44, y: 272, w: W - 56, h: 110 } : { x: 610, y: 20, w: W - 640, h: H - 70 }, [0, 14], [0, 800], {
 			xTicks: [0, 4, 8, 12],
 			yTicks: [0, 200, 400, 600, 800],
 			xLabel: 'speed [m/s]',

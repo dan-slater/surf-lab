@@ -10,7 +10,7 @@
 	import Frame from './Frame.svelte';
 	import Slider from './Slider.svelte';
 	import { G, clamp, fmt } from './physics';
-	import { axes, curve, hline, label, vline } from './plot';
+	import { axes, curve, fitLabel, hline, label, vline } from './plot';
 	import { useStage } from './use-stage.svelte';
 	import type { SwellProps } from './types';
 	import type { Stage } from './stage';
@@ -26,11 +26,11 @@
 
 	let canvas = $state<HTMLCanvasElement>();
 	let readout = $state('');
-	useStage(() => canvas, 880, 360, draw);
+	useStage(() => canvas, { W: 880, H: 360, narrowH: (w) => Math.max(300, w * 0.9) }, draw);
 
 	const RHO = 1025, CF = 0.003, KN = 0.5144;
 
-	function draw({ ctx, W, H, col: COL }: Stage) {
+	function draw({ ctx, W, H, col: COL, narrow }: Stage) {
 		ctx.fillStyle = COL.ink;
 		ctx.fillRect(0, 0, W, H);
 		const q = (U: number) => 0.5 * RHO * U * U;
@@ -38,8 +38,8 @@
 		const Lm = Lft * 0.3048;
 		const hull = 1.34 * Math.sqrt(Lft) * KN;
 		const plane = 1.5 * Math.sqrt(G * Lm);
-		const A = axes(ctx, COL, { x: 60, y: 22, w: W - 110, h: H - 74 }, [0, 10], [0, 2], {
-			xTicks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+		const A = axes(ctx, COL, { x: narrow ? 46 : 60, y: 22, w: W - (narrow ? 56 : 110), h: H - 74 }, [0, 10], [0, 2], {
+			xTicks: narrow ? [0, 2, 4, 6, 8, 10] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
 			yTicks: [0, 0.5, 1, 1.5, 2],
 			xLabel: 'speed U [m/s]',
 			yLabel: 'wetted area [m²]'
@@ -47,15 +47,15 @@
 		// regimes
 		ctx.fillStyle = COL.a(COL.gold, 0.07);
 		ctx.fillRect(A.X(0), A.box.y, A.X(hull) - A.X(0), A.box.h);
-		label(ctx, COL, 'paddling: displacement', A.X(hull / 2), A.box.y + 14, COL.gold, 'center', 9.5);
+		if (!narrow) label(ctx, COL, 'paddling: displacement', A.X(hull / 2), A.box.y + 14, COL.gold, 'center', 9.5);
 		vline(ctx, A, hull, COL.gold, [2, 3]);
-		label(ctx, COL, `hull speed ${fmt(hull, 1)} m/s`, A.X(hull) + 4, A.box.y + 30, COL.gold);
+		fitLabel(ctx, COL, narrow ? `hull ${fmt(hull, 1)}` : `hull speed ${fmt(hull, 1)} m/s`, A.X(hull), A.box.y + 30, COL.gold, A.box.x + A.box.w);
 		vline(ctx, A, plane, COL.a(COL.teal, 0.7));
-		label(ctx, COL, `Fn = 1.5 on full length: ${fmt(plane, 1)} m/s`, A.X(plane) + 4, A.box.y + 46, COL.teal);
+		fitLabel(ctx, COL, narrow ? `Fn 1.5: ${fmt(plane, 1)}` : `Fn = 1.5 on full length: ${fmt(plane, 1)} m/s`, A.X(plane), A.box.y + 46, COL.teal, A.box.x + A.box.w);
 		hline(ctx, A, 0.6, COL.a(COL.foam, 0.5), [6, 4]);
-		label(ctx, COL, '6 ft board planform ≈ 0.6 m²', A.X(9.9), A.Y(0.6) - 5, COL.muted, 'right');
+		label(ctx, COL, narrow ? '6 ft planform 0.6 m²' : '6 ft board planform ≈ 0.6 m²', A.X(9.9), A.Y(0.6) - 5, COL.muted, 'right');
 		curve(ctx, A, area, COL.accent, 2.2, [], [1, 10]);
-		label(ctx, COL, `area a ${fmt(Wn, 0)} N load needs at C_L = ${fmt(CL, 2)}`, A.X(9.9), A.Y(area(9.5)) - 8, COL.accent, 'right');
+		label(ctx, COL, narrow ? `area needed, C_L ${fmt(CL, 2)}` : `area a ${fmt(Wn, 0)} N load needs at C_L = ${fmt(CL, 2)}`, A.X(9.9), A.Y(area(9.5)) - 8, COL.accent, 'right');
 
 		const D = (U: number) => Wn * Math.tan((tau * Math.PI) / 180) + q(U) * area(U) * CF;
 		const LD = 1 / Math.tan((line * Math.PI) / 180);
