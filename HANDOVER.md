@@ -1,5 +1,58 @@
 # surf-lab — HANDOVER
 
+> ## APP LINE (build-order step 3), 2026-10-09: cover, dial, globe, forecast, spin-up BUILT; click-a-coast proven headless
+>
+> **Built (branch `app`, worktree `~/code/surf-lab-app`, main merged in at `a512b1f`):**
+> - Routes: `/` cover + dial (one full-screen sim, chrome on any key or click, hidden after 10 s idle);
+>   `/map` globe (map-kit pins, panel with facts + today's forecast, click any coast -> sim in a WebGPU
+>   overlay registered to the map, panning re-centres, "Cover this spot"); `/spot/[slug]` x 20 (sim,
+>   named sections, forecast, swell-window compass). `+layout.svelte`, `src/app.css` palette tokens
+>   (ink / teal / coral, Fraunces + Instrument Sans + Spline Sans Mono via Google Fonts), favicons.
+> - `src/lib/spots/`: 20-spot catalogue (`spots.json`, `spots.ts`, J-Bay first with its 8 sections and
+>   a pinned frame that reproduces `jbayGrid(dx)` exactly), tile coastlines for 16 spots
+>   (`coasts/*.json`, `scripts/fetch-coasts.ts`), `tiles.ts` (coast from tiles with a water-side check),
+>   `frame.ts` + `FRAME-CHOICE.md` (open-sea ray test guarding `gridFromCoast`), `scene.ts`, `load.ts`.
+> - `src/lib/forecast/`: Open-Meteo Marine, many points per request, memory + localStorage cache per
+>   spot per local day, shared in-flight requests, `todayFor` / `todayForAll`, recorded fixtures.
+> - `src/lib/state/`: one runes store `{ spot, swell (deep-water Hs/Tp/dirDeg), source, chrome }` + README.
+> - `src/lib/ui/`: `SimView.svelte` (fill or map-overlay mode, debug painter behind one call so step 4
+>   can swap it), `sim-engine.ts` (spin-up and sets STUBBED in JS via `setSwell`, see ui/README),
+>   `Dial`, `CompassDial`, `SpotFacts`, `today.ts`.
+>
+> **Works, with evidence (2026-10-09, zulzi 4090, headless Chrome from `scripts/browser.ts`):**
+> `bun run check` 0 errors; `bun test` 45 pass (11 forecast, 6 catalogue/scene incl. every bundled
+> coast's grid facing the open sea); `bun run build` prerenders `/`, `/map`, 20 `/spot/*`; MapLibre is
+> only in the `/map` chunk (cover node 5 KB). `scripts/map-click.ts` zooms near Durban (not in the
+> catalogue), clicks the coast with the real mouse, and has a running sim in 3.5 s: grid 384 x 640 at
+> 6.25 m, wavemaker offshore, coast registered to the map; with `COVER=1` it presses "Cover this spot",
+> reloads `/` and the clicked coast comes back from localStorage. `scripts/map-pin-pan.ts`: J-Bay pin ->
+> panel (facts + live forecast) -> "Simulate here" -> drag 350 px -> new domain key (re-centred).
+> Screenshots in `zulzi:~/orch-scratch/app-shots/` (`cover.png`, `cover-phone.png`, `map.png`,
+> `map-click.png`, `map-jbay.png`, `spot-jbay.png`, `spot-nazare.png`); `scripts/app-shot.ts` composites
+> WebGPU canvases into page shots.
+>
+> **Found on the way (UPSTREAM to map-kit):** `coastlineNear` documents water on the LEFT; measured
+> against the rendered map the water is on the RIGHT for every polyline at all 18 catalogue spots that
+> returned a coast, and at Durban. The app now probes each polyline with `queryRenderedFeatures` and
+> flips it (`tiles.ts`); map-kit should fix the doc or the winding. Also: the v0.1.0 tag's `prepare`
+> (svelte-package, Kit 2 config) fails under Kit 3 / Vite 8, so the app aliases map-kit's shipped
+> `src/lib` (vite.config.ts + tsconfig paths); and Bun rejects `#semver:^0.1.0`, so the pin is `#v0.1.0`.
+>
+> **Does not work / not done:** spin-up and sets are JS stubs until the solver's `rampFrom(0)` and
+> `setSwell({ groupiness })` land; rendering is the debug painter (step 4); no bundled sim for
+> Cloudbreak (reef 3 km offshore), Skeleton Bay (catalogue position 1.3 km inland) and Lance's Right
+> (no ocean coast within 3.5 km): their pages say why. Coordinates came from memory, not a survey;
+> `fetch-coasts.ts` checks each one against the coast (all others within 360 m). Clicked coasts are
+> often `squeezed` (water kept, land margin lost). Not tested on a real phone or on Safari.
+>
+> **Open questions:** confirm coordinates for Skeleton Bay, Lance's Right, Pasta Point, Punta de Lobos,
+> Teahupo'o (287 m inland); should the cover fetch "today" on its own, or only on the button (now: button;
+> `/map` clicks and spot pages fetch automatically); default speed 4 model s per real s, fine?
+>
+> **Next for this line:** swap the stubs for `rampFrom` / `groupiness` when the sim line lands them;
+> "working today" colouring on the globe pins from `todayForAll` + `readStats`; let `SimView` take the
+> step-4 renderer. Dev server: tmux `surflab-app`, `http://127.0.0.1:5182/` (`/map`, `/spot/jeffreys-bay`).
+
 > ## SIM LINE, 2026-10-09: step 2 accepted; grid-from-coast, swell-direction conversion and the CPU parity run DONE
 >
 > **New since step 2 was accepted (on `main`):**

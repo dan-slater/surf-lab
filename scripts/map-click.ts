@@ -37,4 +37,16 @@ await page.waitForTimeout(Number(process.env.WAIT ?? 20000));
 console.log((await page.evaluate(() => document.querySelector('.bar')?.textContent ?? '')).replace(/\s+/g, ' '));
 await compositeShot(page, out);
 console.log(`wrote ${out}`);
+if (process.env.COVER === '1') {
+	// "Cover this spot", then a reload: the clicked coast must come back from localStorage
+	await page.getByRole('button', { name: 'Cover this spot' }).click();
+	await page.waitForURL(`${base}/`);
+	await page.waitForTimeout(12000);
+	await page.reload();
+	await page.waitForTimeout(15000);
+	await page.keyboard.press('Space');
+	await page.waitForTimeout(600);
+	console.log('cover after reload:', (await page.locator('select').first().inputValue()), (await page.locator('.dial').innerText()).replace(/\s+/g, ' ').slice(0, 160));
+	await compositeShot(page, out.replace(/\.png$/, '-cover.png'));
+}
 await b.close();
