@@ -4,9 +4,9 @@
  * choice is written up in FRAME-CHOICE.md.
  */
 import type { BathyOverrides, GridSpec } from '../sim/bathy';
-import { gridFromCoast } from '../sim/grid';
+import { gridForCoast } from './frame';
 import type { Coast } from './coasts';
-import type { Section, Spot } from './spots';
+import { isCustom, type Section, type Spot } from './spots';
 
 export interface SimScene {
 	/** changes whenever the domain changes; a new key means a new solver */
@@ -22,10 +22,20 @@ export interface SimScene {
 	sections: Section[];
 	/** the placement could not keep 1 km of water in front of the core */
 	squeezed: boolean;
+	/** gridFromCoast's frame faced enclosed water and was replaced by the open-sea direction */
+	guarded: boolean;
 }
+
+/** compass bearing the grid's offshore axis points to: a swell from here runs straight onshore */
+export const offshoreBearing = (g: GridSpec) => (((90 - g.rotationDeg) % 360) + 360) % 360;
 
 /** Domain size in metres: the J-Bay reference domain. */
 export const DOMAIN = { across: 2400, along: 6400 };
+/**
+ * A clicked coast: shorter along shore, because the map's coastline query
+ * covers about 2 km either side of the click.
+ */
+export const CLICK_DOMAIN = { across: 2400, along: 4000 };
 
 /**
  * Cell size: 6.25 m (the sim line's recommended default) unless the device
@@ -43,10 +53,12 @@ export function defaultDx(): number {
 }
 
 export function buildScene(spot: Spot, coast: Coast, dx: number): SimScene {
-	const nx = Math.round(DOMAIN.across / dx);
-	const ny = Math.round(DOMAIN.along / dx);
+	const d = isCustom(spot) ? CLICK_DOMAIN : DOMAIN;
+	const nx = Math.round(d.across / dx);
+	const ny = Math.round(d.along / dx);
 	let grid: GridSpec;
 	let squeezed = false;
+	let guarded = false;
 	const f = spot.frame;
 	if (f?.origin && f.rotationDeg !== undefined) {
 		// a hand-placed grid (J-Bay): corner of cell (0, 0) plus half a cell along both axes
@@ -60,9 +72,10 @@ export function buildScene(spot: Spot, coast: Coast, dx: number): SimScene {
 			rotationDeg: f.rotationDeg
 		};
 	} else {
-		const g = gridFromCoast(coast.polylines, { dx, nx, ny, oceanSide: coast.oceanSide, rotationDeg: f?.rotationDeg });
+		const g = gridForCoast(coast.polylines, { dx, nx, ny, oceanSide: coast.oceanSide, rotationDeg: f?.rotationDeg });
 		grid = g.grid;
 		squeezed = g.info.squeezed;
+		guarded = g.guarded;
 	}
 	return {
 		key: `${spot.slug}@${spot.lat.toFixed(5)},${spot.lon.toFixed(5)}/${dx}`,
@@ -74,6 +87,7 @@ export function buildScene(spot: Spot, coast: Coast, dx: number): SimScene {
 		overrides: spot.recipe,
 		maxObliquityDeg: f?.maxObliquityDeg,
 		sections: spot.sections ?? [],
-		squeezed
+		squeezed,
+		guarded
 	};
 }
