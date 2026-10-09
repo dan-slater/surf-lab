@@ -1,5 +1,60 @@
 # surf-lab — HANDOVER
 
+> ## BOOK LINE (build-order step 5), 2026-10-09: the book is built, 9 chapters prerender with maths, 21 instruments swap on scroll
+>
+> **Built (branch `book`, worktree `~/code/surf-lab-book`):** `/book` (contents, nine ledes) and
+> `/book/[chapter]` (text left; the section's instrument pinned right and swapped as you scroll by
+> IntersectionObserver on the section headings; a picker overrides it, "follow" resumes; a swell
+> strip (Hs, Tp, direction) drives every instrument; under 1100 px each section gets its instrument
+> as an inline figure, mounted lazily). All chapter fields are rendered: title, lede, sections
+> (body, "on the wave", figure brief in a fold), key equations with meaning and worked example,
+> references with "why read it", revision notes in a fold. `[n]` markers link to the references,
+> `#slug` links become chapter routes. `/book/instruments` shows all 21 at once.
+> `scripts/sync-content.mjs` copies `$SURF_BOOK_DIR` (default `~/surf-physics-book/chapters`) into
+> `content/chapters/` (git-ignored), checks all nine parse, fails loudly otherwise; wired as
+> `predev` and `prebuild` (bun runs both). Type: Libertinus Serif via `@fontsource`, labels in
+> Spline Sans Mono, palette as CSS tokens in `src/routes/book/tokens.css`.
+>
+> **Maths:** KaTeX `renderToString` at BUILD time on the raw JSON strings (`src/routes/book/math.ts`),
+> not client auto-render: `breaking` and `swell` hold bare `\(u < c\)` and `\(h > L/2\)` inside
+> `body_html`, which an HTML parser mangles before auto-render can see them. Pages ship finished
+> maths and no KaTeX JS. Libertinus Math is unused: KaTeX cannot take an OpenType math font.
+>
+> **Instruments (`src/lib/instruments/`, README there):** P1 to P6 lifted with the maths and drawing
+> code unchanged (colours and fonts to tokens only; P6 lost the "v0 was this" dot and gained an
+> `onPeel` backdrop). Rendered headless against the original page at the same inputs, P1 and P3
+> readouts are identical and P5's time step agrees. Fifteen derived ones, each from equations its
+> chapter states: swell arrival/sets, swell power and reach, Iribarren, the 2-D sim (WebGPU,
+> `createSolver` + debug renderer on J-Bay, captured frame as fallback), catching gap, refraction,
+> tide, rip pulses, height statistics, effective flow, section speed (J-Bay's sections), face
+> acceleration, banked turn, board planing, fin lift. `instrumentFor(slug, i)` in `map.ts`
+> returns `{id, caption, props?}[]`. Each takes `{Hs, Tp, dirDeg, spot?}`; default J-Bay 2.5 m,
+> 15 s, from 225°; the day chapter opens on its own worked swell (1.5 m, 14 s).
+> **State hook:** `src/routes/book/[chapter]/+page.svelte`, comment `HOOK(app state)`: replace the
+> local `swell` $state with the app line's store (one line) and drop the swell strip.
+>
+> **Works, with evidence:** `bun run check` 0 errors, 0 warnings; `bun test` 27 pass (11 sim + 16
+> book: worked examples from five chapters reproduce, e.g. H_b 2.28 m, ξ₀ 0.41/1.24, R 6.5/3.8 m;
+> the renderer keeps `u < c` out of the HTML); `bun run build` prerenders `/book`, nine chapters
+> and `/book/instruments`, 213 KaTeX blocks, 0 `katex-error`, 0 leftover delimiters. Headless
+> Chromium (sim line's `scripts/browser.ts`, 4090 Vulkan) via `bun scripts/shoot-instruments.ts`:
+> one screenshot per instrument in `docs/img/instruments/`, page shots in `docs/img/book/`; the
+> bench on `/book/breaking` swaps P1 → P3 → P2 → Iribarren → P4 while scrolling; the 2-D sim runs
+> live (`docs/img/instruments/sim.png`). Only console noise: `/favicon.ico` 404 (site-wide).
+> Dev server: tmux `surflab-book`, `http://127.0.0.1:5183/book`.
+>
+> **Open questions:** (1) swell direction has two meanings: P3 and the book use the REGIONAL
+> deep-water direction (SW, 225°), the solver uses the LOCAL wavemaker direction (Run A, 120°);
+> `Sim2D` takes its own `localDirDeg` so the book's 225° does not point the wavemaker offshore. The
+> app store needs to say which it carries. (2) Per-section peel angles at J-Bay are not in the
+> review; `SectionSpeed` starts each section at 45° for the reader to set, until the 2-D sim
+> breaks and can measure them. (3) Canvases keep their research-notes logical sizes (880 wide);
+> on phones they scroll sideways at a 600 px minimum rather than reflow. (4) `favicon.ico` is
+> missing site-wide (static/ is the app line's).
+>
+> **Next for this line:** bind the state hook when `#lib/state` lands; reflowing phone layouts for
+> the widest instruments; draw the chapters' figure briefs (`diagram_spec`) as static SVG figures.
+
 > ## SIM LINE (build-order step 2), 2026-10-09: module built, bathy exact, wave parity FAILS by design of first order
 >
 > **Built (all on `main`, zulzi-gpu):** SvelteKit 3 + Svelte 5 + adapter-static scaffold (bun; `#lib/*`
