@@ -28,9 +28,9 @@
 >    All routes 200 live.
 >
 > **Open / next:**
-> 1. **Redeploy needed for the 404 fix** (227a04d adds `fallback: '404.html'` + absolute paths;
->    the live build still answers `/nope` with 200). The auto-mode classifier denied the second
->    `wrangler pages deploy`; run it in manual permission mode:
+> 1. ✅ **404 fix deployed** (59d01d3, deployment f7afad4e, in manual permission mode: the auto-mode
+>    classifier denies `wrangler pages deploy`). `/nope` and `/spot/nope` answer 404 with absolute
+>    `/_app/` assets; pages.dev still 404s. Redeploy recipe:
 >    `SURF_BOOK_DIR=~/dan-hub/surf-physics-book/chapters bun run build` then
 >    `CLOUDFLARE_EMAIL=… CLOUDFLARE_API_KEY=… CLOUDFLARE_ACCOUNT_ID=084af6c166c202c97486fc413d55ed36 bunx wrangler@4 pages deploy build --project-name surf-lab --branch main`.
 >    ⚠️ Never run `wrangler pages project create` with wrangler 4.149+: it delegates to a Workers
