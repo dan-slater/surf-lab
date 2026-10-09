@@ -1,19 +1,24 @@
 /**
- * One running simulation: bathymetry from the scene, the solver, the debug
- * painter, and the forcing schedule (spin-up from flat, sets and lulls).
- * SimView.svelte drives it; the renderer behind `draw()` is the sim line's
- * debug painter until build step 4 replaces it.
+ * One running simulation: bathymetry from the scene, the solver, the product
+ * renderer, the breaking-front tracker and the surfers. The solver does the
+ * forcing schedule itself (spin-up from flat with `rampFrom`, sets and lulls
+ * with `Swell.groupiness`), and `solver.budget` holds each frame to a GPU time.
+ * SimView.svelte drives it.
  */
 import { bathyFromPolyline, JBAY_RECIPE, type GridSpec } from '../sim/bathy';
 import { wavemakerDepth } from '../sim/config';
-import { createDebugRenderer, type Affine, type DebugRenderer, type ExternalTarget } from '../sim/debug-render';
-import { createSolver, type Solver } from '../sim/solver';
-import { generatorDirection, type GeneratorDirection } from '../sim/swell';
+import type { Affine, ExternalTarget } from '../sim/debug-render';
+import { createRenderer, type Renderer } from '../sim/render/renderer';
+import { createFrontTracker, type FrontTracker } from '../sim/render/fronts';
+import { createSurfers, type SurferCrowd } from '../sim/render/surfers';
+import { createSolver, type Solver, type SolverBudget } from '../sim/solver';
+import { generatorDirection, type GeneratorDirection, type Swell } from '../sim/swell';
 import type { SimScene } from '../spots/scene';
 import type { SpotSwell } from '../spots/spots';
 
 export interface EngineOptions {
 	device: GPUDevice;
+	/** a page canvas (configured here, opaque) or map-kit's overlay context (drawn over the basemap) */
 	target: HTMLCanvasElement | ExternalTarget;
 	scene: SimScene;
 	/** deep-water swell (the store's numbers); turned into the wavemaker direction here */
@@ -24,6 +29,10 @@ export interface EngineOptions {
 	spinUpSeconds?: number;
 	/** modulate the swell into sets and lulls (default true) */
 	sets?: boolean;
+	/** stick surfers at the scene's named sections (default 8; 0 = none) */
+	surfers?: number;
+	/** GPU milliseconds a frame may spend on the sim and its drawing (default 12) */
+	budgetMs?: number;
 }
 
 export interface SimEngine {
@@ -31,42 +40,22 @@ export interface SimEngine {
 	readonly grid: GridSpec;
 	/** how the last deep-water direction mapped onto this coast */
 	readonly generator: GeneratorDirection;
-	/** 0..1 progress of the spin-up ramp */
-	readonly spinUp: number;
+	/** the budget's verdict: 'full', slow motion, or asking for a coarser grid */
+	readonly level: SolverBudget['level'];
+	/** the crowd, when the scene has sections to form lineups at */
+	readonly crowd: SurferCrowd | null;
 	/** advance by real elapsed time and paint */
 	tick(now: number): void;
 	setSwell(swell: SpotSwell): void;
-	setAffine(m: Affine): void;
+	setAffine(m: Affine, pixelRatio?: number): void;
 	dispose(): void;
 }
 
 /** wavemaker band and sponges kept constant in metres across cell sizes */
 const WAVEMAKER_M = 75;
 const SPONGE_M = 150;
-
-/**
- * Sets and lulls as a slow envelope on Hs: a set of N waves (8 to 12, drawn
- * afresh each cycle) followed by a lull of the same length. Range 0.45..1.
- *
- * STUB: the sim line is adding `setSwell({ groupiness })` and `rampFrom(0)` to
- * the solver; when they land, this schedule and the Hs scaling in `force()`
- * go and the solver does both.
- */
-function setEnvelope(Tp: number) {
-	let start = 0;
-	let period = 2 * 10 * Tp;
-	const draw = () => 2 * (8 + Math.floor(Math.random() * 5)) * Tp;
-	return (t: number) => {
-		while (t - start >= period) {
-			start += period;
-			period = draw();
-		}
-		const p = (t - start) / period;
-		return 0.45 + 0.55 * Math.sin(Math.PI * p) ** 2;
-	};
-}
-
-const smoothstep = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+/** lull depth when sets are on; the sim line's cover runs 0.5 */
+const GROUPINESS = 0.5;
 
 export function createSimEngine(o: EngineOptions): SimEngine {
 	const { scene, device } = o;
@@ -77,17 +66,18 @@ export function createSimEngine(o: EngineOptions): SimEngine {
 	const wmCells = WAVEMAKER_M / grid.dx;
 	const d0 = wavemakerDepth(depth, grid.nx, grid.ny, wmCells);
 	const speed = o.speed ?? 4;
-	const spinUpMs = (o.spinUpSeconds ?? 20) * 1000;
 	const useSets = o.sets ?? true;
 
-	let target = o.swell;
-	let generator = generatorDirection(target.dirDeg, grid, d0, { Tp: target.Tp, maxObliquityDeg: scene.maxObliquityDeg });
-	let envelope = setEnvelope(target.Tp);
-	const local = (scale: number) => ({
-		Hs: Math.max(0, target.Hs * scale),
-		Tp: target.Tp,
+	const mapDir = (s: SpotSwell) =>
+		generatorDirection(s.dirDeg, grid, d0, { Tp: s.Tp, maxObliquityDeg: scene.maxObliquityDeg });
+	let generator = mapDir(o.swell);
+	const local = (s: SpotSwell): Swell => ({
+		Hs: Math.max(0, s.Hs),
+		Tp: s.Tp,
 		dirDeg: generator.dirDeg,
-		spread: 20
+		spread: 20,
+		groupiness: useSets ? GROUPINESS : 0,
+		groupWaves: 8
 	});
 
 	const solver = createSolver(device, {
@@ -95,70 +85,81 @@ export function createSimEngine(o: EngineOptions): SimEngine {
 		ny: grid.ny,
 		dx: grid.dx,
 		depth,
-		swell: local(0),
+		swell: local(o.swell),
 		rotationDeg: grid.rotationDeg,
 		wavemaker: { width: wmCells },
 		sponge: { width: SPONGE_M / grid.dx }
 	});
-	const painter: DebugRenderer = createDebugRenderer(solver, o.target);
+	solver.rampFrom(0, { seconds: o.spinUpSeconds ?? 20 });
+
 	const external = !(o.target instanceof HTMLCanvasElement);
+	let context: GPUCanvasContext;
+	let format: GPUTextureFormat;
+	if (external) {
+		({ context, format } = o.target as ExternalTarget);
+	} else {
+		context = (o.target as HTMLCanvasElement).getContext('webgpu') as GPUCanvasContext;
+		format = navigator.gpu.getPreferredCanvasFormat();
+		context.configure({ device, format, alphaMode: 'opaque' });
+	}
+	const renderer: Renderer = createRenderer(solver, {
+		context,
+		format,
+		affine: [1, 0, 0, 0, 1, 0],
+		rotationDeg: grid.rotationDeg,
+		overlay: external
+	});
+	renderer.setHs(o.swell.Hs);
+	const tracker: FrontTracker = createFrontTracker(solver, grid);
+	const zones = scene.sections
+		.filter((s) => s.x !== undefined && s.y !== undefined)
+		.map((s) => [s.x!, s.y!] as [number, number]);
+	const count = o.surfers ?? 8;
+	const crowd = zones.length && count > 0 ? createSurfers({ zones, depth, grid, count, seed: 7 }) : null;
+	const budget = solver.budget(o.budgetMs ?? 12);
 
-	let t0 = -1;
-	let prev = 0;
-	let owed = 0;
-	let lastForce = -Infinity;
-	let ramp = 0;
-
-	const force = () => {
-		const env = useSets ? envelope(solver.time) : 1;
-		solver.setSwell(local(ramp * env));
-	};
-
+	let prev = -1;
 	return {
 		solver,
 		grid,
+		crowd,
 		get generator() {
 			return generator;
 		},
-		get spinUp() {
-			return ramp;
+		get level() {
+			return budget.level;
 		},
 		tick(now: number) {
-			if (t0 < 0) t0 = prev = now;
-			owed += (Math.min(now - prev, 100) / 1000) * speed;
+			const realDt = prev < 0 ? 0 : Math.min(now - prev, 100) / 1000;
 			prev = now;
-			ramp = smoothstep((now - t0) / spinUpMs);
-			// refresh the forcing a few times per model second, not every frame
-			if (solver.time - lastForce > 0.5 || (ramp < 1 && now - t0 < spinUpMs + 200)) {
-				force();
-				lastForce = solver.time;
-			}
-			const n = Math.floor(owed / solver.params.dt);
-			owed -= n * solver.params.dt;
-			if (n > 0) solver.step(Math.min(n, 64));
-			painter.draw();
+			const t0 = solver.time;
+			budget.frame(realDt * speed, realDt, () => {
+				renderer.draw(solver.time);
+				tracker.update();
+			});
+			crowd?.update(solver.time - t0, realDt, tracker.fronts());
 		},
 		setSwell(s: SpotSwell) {
-			const tpChanged = s.Tp !== target.Tp;
-			target = s;
-			generator = generatorDirection(s.dirDeg, grid, d0, { Tp: s.Tp, maxObliquityDeg: scene.maxObliquityDeg });
-			if (tpChanged) envelope = setEnvelope(s.Tp);
-			force();
+			generator = mapDir(s);
+			solver.setSwell(local(s));
+			renderer.setHs(s.Hs);
 		},
-		setAffine: painter.setAffine,
+		setAffine: (m: Affine, pr?: number) => renderer.setAffine(m, pr),
 		dispose() {
 			if (external) {
 				// leave the shared overlay canvas empty rather than frozen on the last frame
-				const t = o.target as ExternalTarget;
 				const enc = device.createCommandEncoder();
 				enc.beginRenderPass({
 					colorAttachments: [
-						{ view: t.context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
+						{ view: context.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
 					]
 				}).end();
 				device.queue.submit([enc.finish()]);
+			} else {
+				context.unconfigure();
 			}
-			painter.dispose();
+			tracker.dispose();
+			renderer.dispose();
 			solver.dispose();
 		}
 	};

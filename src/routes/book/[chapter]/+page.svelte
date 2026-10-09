@@ -15,17 +15,21 @@
 	import InstrumentView from '../InstrumentView.svelte';
 	import LazyMount from '../LazyMount.svelte';
 	import { fmt } from '#lib/instruments/physics.ts';
+	import { app } from '#lib/state/index.ts';
+	import { untrack } from 'svelte';
 
 	let { data } = $props();
 	const ch = $derived(data.chapter);
 
-	// HOOK(app state): the swell every instrument receives. When the app line's
-	// global store lands in #lib/state, replace this $state with the store's
-	// current spot and swell (one line), and drop the local sliders below.
+	// The swell every instrument receives. The instruments are all built on
+	// J-Bay, so the visitor's swell from the app store seeds them only when their
+	// spot is J-Bay; a chapter preset wins over both. The sliders stay local:
+	// reading the book never changes the cover.
 	let swell = $state({ ...DEFAULT_SWELL });
 	$effect.pre(() => {
 		const s = CHAPTER_SWELL[ch.slug];
-		swell = { ...DEFAULT_SWELL, ...s };
+		const mine = untrack(() => (app.spot.slug === 'jeffreys-bay' ? $state.snapshot(app.swell) : null));
+		swell = { ...DEFAULT_SWELL, ...mine, ...s };
 	});
 
 	const perSection = $derived(ch.sections.map((_, i) => instrumentFor(ch.slug, i)));

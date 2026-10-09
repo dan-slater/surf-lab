@@ -19,6 +19,9 @@
 
 	type Status = { state: 'idle' | 'starting' | 'running' | 'error'; message?: string; offshore?: boolean };
 
+	/** CSS pixels per metre under a grid -> clip affine on a W x H canvas */
+	const pxPerMeter = (m: Affine, W: number, H: number, dx: number) => Math.hypot((m[0] * W) / 2, (m[3] * H) / 2) / dx;
+
 	let {
 		scene,
 		swell,
@@ -40,6 +43,7 @@
 	} = $props();
 
 	let canvas = $state<HTMLCanvasElement>();
+	let figures = $state<HTMLCanvasElement>();
 	let status = $state<Status>({ state: 'idle' });
 	let engine: SimEngine | null = null;
 	let affine: Affine | null = null;
@@ -77,30 +81,43 @@
 			const target = ov
 				? { context: ov.gpu!.context as GPUCanvasContext, format: ov.gpu!.format as GPUTextureFormat }
 				: cv!;
-			local = createSimEngine({ device: dev, target, scene: sc, swell: untrack(() => $state.snapshot(swell)), speed, spinUpSeconds, sets });
+			// surfers are drawn on a 2d canvas above the sea, so only on the page surface
+			local = createSimEngine({ device: dev, target, scene: sc, swell: untrack(() => $state.snapshot(swell)), speed, spinUpSeconds, sets, surfers: ov ? 0 : 8 });
 			engine = local;
 			current = sc;
 			setStatus({ state: 'running', offshore: local.generator.fromBehind });
 			const enu = enuFrame(sc.lat, sc.lon);
+			const ctx2d = !ov && figures ? figures.getContext('2d') : null;
+			let dpr = 1;
 			const loop = (now: number) => {
 				if (!alive || !local) return;
 				if (ov) {
-					local.setAffine(affineFromOverlay(sc.grid, enu, ov));
+					local.setAffine(affineFromOverlay(sc.grid, enu, ov), ov.pixelRatio);
 				} else if (cv) {
-					const dpr = Math.min(devicePixelRatio || 1, 2);
+					dpr = Math.min(devicePixelRatio || 1, 2);
 					const w = cv.clientWidth, h = cv.clientHeight;
 					if (w && h && (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr))) {
 						cv.width = Math.round(w * dpr);
 						cv.height = Math.round(h * dpr);
+						if (figures) {
+							figures.width = cv.width;
+							figures.height = cv.height;
+						}
 					}
 					if (w !== size.w || h !== size.h || !affine) {
 						size = { w, h };
 						affine = fillAffine(sc.grid, w, h);
-						local.setAffine(affine);
+						local.setAffine(affine, dpr);
 						placeLabels(sc);
 					}
 				}
 				local.tick(now);
+				if (ctx2d && affine && local.crowd) {
+					const a = affine, { w, h } = size;
+					ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+					ctx2d.clearRect(0, 0, w, h);
+					local.crowd.draw(ctx2d, (x, y) => enuToPixel(sc.grid, a, w, h, x, y), pxPerMeter(a, w, h, sc.grid.dx));
+				}
 				raf = requestAnimationFrame(loop);
 			};
 			raf = requestAnimationFrame(loop);
@@ -153,6 +170,7 @@
 {:else}
 	<div class="simview">
 		<canvas bind:this={canvas}></canvas>
+		<canvas bind:this={figures} class="figures"></canvas>
 		{#each labelPos as l (l.name)}
 			<span class="label" style="left: {l.x}px; top: {l.y}px">{l.name}</span>
 		{/each}
@@ -177,6 +195,11 @@
 		width: 100%;
 		height: 100%;
 		display: block;
+	}
+	.figures {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
 	}
 	.label {
 		position: absolute;

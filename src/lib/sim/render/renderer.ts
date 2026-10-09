@@ -41,6 +41,12 @@ export interface RendererOptions {
 	/** grid rotation, to turn compass bearings into grid directions (default 0) */
 	rotationDeg?: number;
 	look?: RenderLook;
+	/**
+	 * Drawing over a map (map-kit's premultiplied overlay canvas): land is left
+	 * transparent so the basemap shows, and the sea fades out past the grid edge.
+	 * Default false: every pixel is opaque.
+	 */
+	overlay?: boolean;
 }
 
 export interface Renderer {
@@ -84,7 +90,7 @@ export function createRenderer(solver: Solver, o: RendererOptions): Renderer {
 		view.set([(lx / ln) * Math.cos(el), (ly / ln) * Math.cos(el), Math.sin(el), look.lightStrength ?? 0.9], 12);
 		view.set([time, Hs, look.exaggeration ?? 7, (look.crestWidth ?? 1.3) * pixelRatio], 16);
 		view.set([(look.foamWidth ?? 1.0) * pixelRatio, look.streakDensity ?? 0.9, look.streakLength ?? 1.6, look.foamOpacity ?? 0.9], 20);
-		view.set([sw[0], sw[1], 0, 0], 24);
+		view.set([sw[0], sw[1], o.overlay ? 1 : 0, 0], 24);
 		// inverse affine: clip -> grid
 		const [a, b, c, d, e, f] = affine;
 		const det = a * e - b * d;

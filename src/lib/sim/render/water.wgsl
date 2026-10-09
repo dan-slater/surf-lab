@@ -16,7 +16,7 @@ struct View {
   light: vec4<f32>,   // light direction in grid space (x along +ix, y along +iy, z up), strength
   look: vec4<f32>,    // time (s), Hs (m), slope exaggeration, crest line width (px)
   foamLook: vec4<f32>,// foam line width (px), streak density, streak length (cells), foam opacity
-  swell: vec4<f32>,   // fallback travel direction in grid space (x, y), unused, unused
+  swell: vec4<f32>,   // fallback travel direction in grid space (x, y), overlay flag (1 = land transparent, edge faded), unused
   inv0: vec4<f32>,    // clip (x, y, 1) -> grid ix
   inv1: vec4<f32>,    // clip (x, y, 1) -> grid iy
 };
@@ -198,6 +198,13 @@ fn segDist(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
 
   var col = mix(land, water, wet);
   // coastline stroke on the still-water line
-  col = mix(col, T.coast.rgb, 0.45 * isoLine(zb, 0.0, fwZb, 1.2));
+  let stroke = 0.45 * isoLine(zb, 0.0, fwZb, 1.2);
+  col = mix(col, T.coast.rgb, stroke);
+  if (V.swell.z > 0.5) {
+    // over a map: the basemap shows through on land and past the grid edge
+    // (premultiplied alpha, as map-kit's overlay canvas is configured)
+    let a = clamp(max(wet, stroke), 0.0, 1.0) * inside;
+    return vec4<f32>(col * a, a);
+  }
   return vec4<f32>(col, 1.0);
 }
