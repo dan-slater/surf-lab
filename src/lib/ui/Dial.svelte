@@ -53,30 +53,32 @@
 	</header>
 
 	<div class="controls">
-		<label class="slider">
-			<span class="k">Height</span>
-			<span class="v num">{app.swell.Hs.toFixed(1)} m</span>
-			<input
-				type="range"
-				min={DIAL.Hs.min}
-				max={DIAL.Hs.max}
-				step={DIAL.Hs.step}
-				value={app.swell.Hs}
-				oninput={(e) => setSwell({ Hs: Number(e.currentTarget.value) }, 'dial')}
-			/>
-		</label>
-		<label class="slider">
-			<span class="k">Period</span>
-			<span class="v num">{app.swell.Tp.toFixed(1)} s</span>
-			<input
-				type="range"
-				min={DIAL.Tp.min}
-				max={DIAL.Tp.max}
-				step={DIAL.Tp.step}
-				value={app.swell.Tp}
-				oninput={(e) => setSwell({ Tp: Number(e.currentTarget.value) }, 'dial')}
-			/>
-		</label>
+		<div class="sliders">
+			<label class="slider">
+				<span class="k">Height</span>
+				<span class="v num">{app.swell.Hs.toFixed(1)} m</span>
+				<input
+					type="range"
+					min={DIAL.Hs.min}
+					max={DIAL.Hs.max}
+					step={DIAL.Hs.step}
+					value={app.swell.Hs}
+					oninput={(e) => setSwell({ Hs: Number(e.currentTarget.value) }, 'dial')}
+				/>
+			</label>
+			<label class="slider">
+				<span class="k">Period</span>
+				<span class="v num">{app.swell.Tp.toFixed(1)} s</span>
+				<input
+					type="range"
+					min={DIAL.Tp.min}
+					max={DIAL.Tp.max}
+					step={DIAL.Tp.step}
+					value={app.swell.Tp}
+					oninput={(e) => setSwell({ Tp: Number(e.currentTarget.value) }, 'dial')}
+				/>
+			</label>
+		</div>
 		<CompassDial
 			value={app.swell.dirDeg}
 			window={isCustom(app.spot) ? null : app.spot.swellWindow}
@@ -148,9 +150,13 @@
 	}
 	.controls {
 		display: grid;
-		grid-template-columns: 1fr 1fr auto;
+		grid-template-columns: 1fr auto;
 		gap: 0.9rem;
 		align-items: center;
+	}
+	.sliders {
+		display: grid;
+		gap: 0.6rem;
 	}
 	.slider {
 		display: grid;
@@ -189,14 +195,5 @@
 	}
 	.honesty {
 		margin: 0.6rem 0 0;
-	}
-	@media (max-width: 420px) {
-		.controls {
-			grid-template-columns: 1fr 1fr;
-		}
-		.controls :global(.compass) {
-			grid-column: 1 / -1;
-			justify-self: center;
-		}
 	}
 </style>

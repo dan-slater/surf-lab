@@ -13,6 +13,9 @@ import type { Page } from 'playwright-core';
 
 export async function compositeShot(page: Page, out: string) {
 	await page.evaluate(() => {
+		// undo a previous shot on this page
+		document.querySelectorAll('img[data-shot]').forEach((i) => i.remove());
+		document.querySelectorAll('canvas').forEach((c) => (c.style.visibility = ''));
 		for (const c of Array.from(document.querySelectorAll('canvas'))) {
 			if (c.classList.contains('maplibregl-canvas')) continue;
 			let url = '';
@@ -23,6 +26,7 @@ export async function compositeShot(page: Page, out: string) {
 			}
 			const img = document.createElement('img');
 			img.src = url;
+			img.dataset.shot = '1';
 			const r = c.getBoundingClientRect();
 			Object.assign(img.style, {
 				position: 'fixed',

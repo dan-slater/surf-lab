@@ -147,7 +147,7 @@
 </svelte:head>
 
 <main class="mapview">
-	<Map bind:this={mapC} bind:map center={[20, 5]} zoom={1.6} style="liberty" {onclick} {onmoveend}>
+	<Map bind:this={mapC} bind:map center={[20, 5]} zoom={2} style="liberty" {onclick} {onmoveend}>
 		{#snippet children()}
 			<Overlay
 				mode="webgpu"
