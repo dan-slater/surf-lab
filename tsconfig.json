@@ -8,6 +8,10 @@
 		"strict": true,
 		"skipLibCheck": true,
 		"resolveJsonModule": true,
-		"types": ["$app/types", "@webgpu/types", "bun"]
+		"types": ["$app/types", "@webgpu/types", "bun"],
+		"paths": {
+			"@dan-slater/map-kit": ["./node_modules/@dan-slater/map-kit/src/lib/index.ts"],
+			"@dan-slater/map-kit/*": ["./node_modules/@dan-slater/map-kit/src/lib/*"]
+		}
 	}
 }

@@ -41,3 +41,6 @@ export function jbayGrid(dx: number): GridSpec {
  * +x). In compass terms the swell arrives FROM 270 - 150 = 120 deg.
  */
 export const JBAY_RUN_A_SWELL = { Hs: 2.5, Tp: 15, dirDeg: 120, spread: 20, gamma: 3.3, seed: 1234 };
+
+/** J-Bay's coast in the shape src/lib/spots/coasts.ts uses (OSM convention: ocean on the right). */
+export const JBAY_COAST = { polylines: [JBAY.coast], oceanSide: 'right' as const, source: JBAY.source };
