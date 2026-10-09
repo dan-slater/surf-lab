@@ -18,4 +18,4 @@ export interface SwellProps {
 }
 
 /** J-Bay on a good day: the book's default swell. */
-export const DEFAULT_SWELL = { Hs: 2.5, Tp: 15, dirDeg: 225 } as const;
+export const DEFAULT_SWELL: { Hs: number; Tp: number; dirDeg: number } = { Hs: 2.5, Tp: 15, dirDeg: 225 };

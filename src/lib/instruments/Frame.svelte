@@ -13,7 +13,8 @@
 		readout = '',
 		error = '',
 		controls,
-		caption
+		caption,
+		figure
 	}: {
 		title: string;
 		W: number;
@@ -24,6 +25,8 @@
 		error?: string;
 		controls?: Snippet;
 		caption?: Snippet;
+		/** Replaces the canvas, e.g. a static image when a live surface is unavailable. */
+		figure?: Snippet;
 	} = $props();
 </script>
 
@@ -32,7 +35,11 @@
 		<span class="title">{title}</span>
 		{#if error}<span class="err">{error}</span>{/if}
 	</div>
-	<canvas bind:this={canvas} style:aspect-ratio="{W} / {H}"></canvas>
+	{#if figure}
+		{@render figure()}
+	{:else}
+		<canvas bind:this={canvas} style:aspect-ratio="{W} / {H}"></canvas>
+	{/if}
 	{#if controls}<div class="controls">{@render controls()}</div>{/if}
 	{#if readout}<div class="readout">{@html readout}</div>{/if}
 	{#if caption}<figcaption>{@render caption()}</figcaption>{/if}
