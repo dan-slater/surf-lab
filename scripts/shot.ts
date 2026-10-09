@@ -9,7 +9,7 @@ import { launch, warmGpu } from './browser';
 const [url, out, wait] = [process.argv[2], process.argv[3], Number(process.argv[4] ?? 5000)];
 const b = await launch();
 const page = await b.contexts()[0].newPage();
-await page.setViewportSize({ width: 1600, height: 760 });
+await page.setViewportSize({ width: Number(process.env.W ?? 1600), height: Number(process.env.H ?? 760) });
 page.on('console', (m) => m.type() !== 'debug' && console.log(`[console.${m.type()}]`, m.text()));
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await warmGpu(page, url);

@@ -18,7 +18,7 @@ import {
 	type SolverOptions
 } from './config';
 import { statsFromSums } from './cpu';
-import type { Swell } from './swell';
+import { thetaFromCompass, type Swell } from './swell';
 
 export type { SolverOptions } from './config';
 
@@ -47,11 +47,17 @@ export interface Solver {
 	 * (eta, h, foam, zb). Updated at the end of every step() call.
 	 */
 	readonly fields: GPUTexture;
+	/** rgba16float, width nx, height ny, texel (ix, iy) = (u, v, 0, 0) in m/s along +ix, +iy */
+	readonly flow: GPUTexture;
 	/** raw buffers: state (h, hu, hv, foam) as vec4<f32> and bed zb as f32, idx = ix * ny + iy */
 	readonly buffers: { state: GPUBuffer; bed: GPUBuffer };
 	/** advance by `substeps` steps of dt (default from options) */
 	step(substeps?: number): void;
 	setSwell(swell: Swell): void;
+	/** the current swell */
+	readonly swell: Swell;
+	/** unit travel direction of the swell in grid space (+ix, +iy) */
+	swellDirection(): [number, number];
 	/** replace the bathymetry and reset to still water */
 	setDepth(depth: Float32Array): void;
 	/** surface elevation (m) on wet cells, 0 on dry */
@@ -91,6 +97,11 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		format: 'rgba16float',
 		usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
 	});
+	const flow = device.createTexture({
+		size: [nx, ny],
+		format: 'rgba16float',
+		usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
+	});
 	{
 		const d = new DataView(new ArrayBuffer(16));
 		d.setUint32(0, nx, true);
@@ -116,7 +127,8 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			{ binding: 1, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 2, visibility: C, buffer: { type: 'read-only-storage' } },
 			{ binding: 3, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } },
-			{ binding: 4, visibility: C, buffer: { type: 'storage' } }
+			{ binding: 4, visibility: C, buffer: { type: 'storage' } },
+			{ binding: 5, visibility: C, storageTexture: { access: 'write-only', format: 'rgba16float' } }
 		]
 	});
 	const stepModule = device.createShaderModule({
@@ -153,7 +165,8 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 				{ binding: 1, resource: { buffer: bed } },
 				{ binding: 2, resource: { buffer: src } },
 				{ binding: 3, resource: fields.createView() },
-				{ binding: 4, resource: { buffer: stats } }
+				{ binding: 4, resource: { buffer: stats } },
+				{ binding: 5, resource: flow.createView() }
 			]
 		});
 	// bind groups per pass, for the current state in A and in B
@@ -261,6 +274,7 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 			return t;
 		},
 		fields,
+		flow,
 		get buffers() {
 			return { state: curIsA ? stateA : stateB, bed };
 		},
@@ -268,6 +282,13 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		setSwell(swell: Swell) {
 			options = { ...options, swell };
 			uploadComponents();
+		},
+		get swell() {
+			return options.swell;
+		},
+		swellDirection() {
+			const th = thetaFromCompass(options.swell.dirDeg, p.rotationDeg);
+			return [Math.cos(th), Math.sin(th)] as [number, number];
 		},
 		setDepth,
 		readState,
@@ -299,6 +320,7 @@ export function createSolver(device: GPUDevice, opts: SolverOptions): Solver {
 		dispose() {
 			for (const b of [bed, stateA, stateB, stateS, comps, stats, params, dims]) b.destroy();
 			fields.destroy();
+			flow.destroy();
 		}
 	};
 }
