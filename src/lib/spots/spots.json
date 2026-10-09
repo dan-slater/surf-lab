@@ -74,8 +74,8 @@
 		"name": "Teahupo'o",
 		"country": "French Polynesia",
 		"region": "Tahiti Iti",
-		"lat": -17.847,
-		"lon": -149.267,
+		"lat": -17.8656,
+		"lon": -149.2533,
 		"wave": {
 			"type": "reef",
 			"direction": "left",
@@ -421,8 +421,8 @@
 		"name": "Skeleton Bay",
 		"country": "Namibia",
 		"region": "Walvis Bay",
-		"lat": -22.96,
-		"lon": 14.42,
+		"lat": -22.9376,
+		"lon": 14.4175,
 		"wave": {
 			"type": "sand point",
 			"direction": "left",
@@ -585,8 +585,8 @@
 		"name": "Lance's Right",
 		"country": "Indonesia",
 		"region": "Sipura, Mentawai Islands",
-		"lat": -2.1736,
-		"lon": 99.62,
+		"lat": -2.3756,
+		"lon": 99.8596,
 		"wave": {
 			"type": "reef",
 			"direction": "right",

@@ -84,6 +84,19 @@ in at the steepest angle the shelf allows.
   behind the beach goes. Water wins, which is the right trade for the sim.
 - Reefs far from land cannot be modelled from a coastline (Cloudbreak is
   about 3 km from Tavarua). The catalogue says so in `modelNote`.
-- Positions checked against the tiles (`scripts/fetch-coasts.ts`): Skeleton
-  Bay falls 1.3 km inland and Lance's Right has no ocean coast within 3.5 km,
-  so both need confirmed coordinates. The others sit within 360 m of the coast.
+- Positions checked against the tiles (`scripts/fetch-coasts.ts`). On
+  2026-10-09 three were moved from town or island centres to the break:
+  Skeleton Bay to -22.9376, 14.4175 (Surfertoday, Pelican Point spit; was 1.3 km
+  inland), Lance's Right to -2.3756, 99.8596 (mondo.surf, south Sipora; the old
+  point was the island centroid with no ocean coast within 3.5 km) and
+  Teahupo'o to -17.8656, -149.2533 (University of Hawai'i surf-spot table,
+  matches surf-forecast's rounded figure; the old point was the village).
+  Pasta Point and Punta de Lobos stay: each is within 0.9 km of mondo.surf's
+  figure and within 330 m of the coast. Every spot now sits within 600 m of
+  the coast; Teahupo'o is 584 m offshore because it breaks on the reef.
+- Two open-sea bearings disagree with their swell windows: Skeleton Bay faces
+  320 deg at the spit tip (window 190 to 240) and Lance's Right faces 55 deg
+  (window 180 to 250). The wavemaker direction still comes from
+  `generatorDirection`, but a pinned `rotationDeg` per spot may read better.
+- Teahupo'o's capture carries thin inland water features (rivers) that the
+  sim treats as sea.
