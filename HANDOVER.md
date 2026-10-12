@@ -1,7 +1,34 @@
 # surf-lab — HANDOVER
 
 
-> ## 🚀 CONTROL-PLANE HANDOVER (2026-10-09 ~08:45 UTC) — merged, integrated, LIVE noindexed at surf.danielslater.dev — READ THIS FIRST
+> ## 🌍 CONTROL-PLANE HANDOVER (2026-10-12) — map-kit v0.1.1 LIVE on the globe; all factory lines retired — READ THIS FIRST
+>
+> **State:** surf-lab `main` bd7f24c is live at https://surf.danielslater.dev (deployment 0118ad4c, noindexed,
+> pages.dev 404, `/nope` 404). map-kit `main` cc8ebcf = tag **v0.1.1** (re-tagged once on 2026-10-12 to carry
+> the `package.json` version bump; nothing had consumed the first tag). surf-lab pins `#v0.1.1`.
+> The globe uses the ink theme with `StarField`, `GlobeGlow`, `Graticule`, and `AutoRotate` only while no sim is open.
+>
+> **Gotcha fixed:** v0.1.1 ships `settings.svelte.ts`; vite's DEV pre-bundler parsed it as plain JS and the
+> dev server failed. `vite.config.ts` excludes map-kit from `optimizeDeps` and includes
+> `@dan-slater/map-kit > maplibre-gl`. Builds were never affected.
+>
+> **⚠️ zulzi WebGPU is broken in headless Chrome since ~2026-10-09 midday:** Dawn logs a Vulkan error and
+> "A valid external Instance reference no longer exists" on every WebGPU page (cover, spot, map overlay),
+> on main and on v0.1.1, on the 4090 and on SwiftShader, with the same Chromium 1248 that worked at 08:30
+> that day. So the sim overlay on the v0.1.1 globe is NOT re-verified on a GPU; the overlay diff is
+> additive (adapter retries, usage/powerPreference options). Check it in a real browser; fixing the box
+> (driver/session state) is for whoever owns zulzi. Also: zulzi has no `node`, so start vite with
+> `bun --bun ./node_modules/.bin/vite dev …`, and :5184 belonged to the mapkit line's consumer app.
+>
+> **Factory lines:** ORCH-sim/app/book/mapkit killed 2026-10-12 (all work merged, checkouts clean); worktrees
+> `surf-lab-app`/`surf-lab-book` removed. Kept: tmux `surflab-dev` :5181 and `mapkit-dev` :5180 on main.
+> Peer `ORCH-fv-*`/footyviz untouched.
+>
+> **Open:** real-browser fps + overlay check on a laptop GPU; Daniel's calls (name, `INDEX`, cover framing,
+> renderer look). **surfism.org** bought 2026-10-12 on the personal CF account (held, empty zone; see
+> `biz/accounts/DOMAINS.md`); the site stays on surf.danielslater.dev until the name is settled.
+
+> ## 🚀 CONTROL-PLANE HANDOVER (2026-10-09 ~08:45 UTC, SUPERSEDED by the block above) — merged, integrated, LIVE noindexed at surf.danielslater.dev — READ THIS FIRST
 >
 > **State:** `main` 227a04d on GitHub, the Mac and `zulzi:~/code/surf-lab`. Branches `app` and `book`
 > are merged (the HANDOVER.md conflicts were the only ones; `bun.lock` regenerated). The branch
