@@ -5,7 +5,7 @@
     "": {
       "name": "surf-lab",
       "dependencies": {
-        "@dan-slater/map-kit": "github:dan-slater/map-kit#v0.1.0",
+        "@dan-slater/map-kit": "github:dan-slater/map-kit#v0.1.1",
         "maplibre-gl": "^5",
       },
       "devDependencies": {
@@ -27,7 +27,7 @@
     },
   },
   "packages": {
-    "@dan-slater/map-kit": ["@dan-slater/map-kit@github:dan-slater/map-kit#13fac64", { "peerDependencies": { "maplibre-gl": "^5", "svelte": "^5" } }, "dan-slater-map-kit-13fac64"],
+    "@dan-slater/map-kit": ["@dan-slater/map-kit@github:dan-slater/map-kit#cc3b4ce", { "peerDependencies": { "maplibre-gl": "^5", "svelte": "^5" } }, "dan-slater-map-kit-cc3b4ce"],
 
     "@fontsource/libertinus-serif": ["@fontsource/libertinus-serif@5.3.0", "", {}, "sha512-re9MYtKfLFxZxlcfV127IqG87wM7kYF9o//xfZufzsr2z22+tfKu5xRJwS9oMksI1fuyh5H9OWQFtVYM8ypiDg=="],
 

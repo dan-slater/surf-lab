@@ -20,5 +20,9 @@ export default defineConfig({
 			{ find: /^@dan-slater\/map-kit\/(.*)$/, replacement: fileURLToPath(new URL('./node_modules/@dan-slater/map-kit/src/lib/', import.meta.url)) + '$1' }
 		]
 	},
+	// the dev pre-bundler compiles map-kit's .svelte.ts files as plain JS and
+	// fails on their types (v0.1.1's settings store); leave map-kit to the
+	// normal Svelte + TS pipeline like app code
+	optimizeDeps: { exclude: ['@dan-slater/map-kit'], include: ['@dan-slater/map-kit > maplibre-gl'] },
 	server: { host: '127.0.0.1', port: 5181, strictPort: true }
 });

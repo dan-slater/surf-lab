@@ -7,7 +7,21 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Map, Pins, Panel, Overlay, coastlineNear, distanceMeters, type Pin, type OverlayFrame } from '@dan-slater/map-kit';
+	import {
+		Map,
+		Pins,
+		Panel,
+		Overlay,
+		StarField,
+		GlobeGlow,
+		Graticule,
+		AutoRotate,
+		themes,
+		coastlineNear,
+		distanceMeters,
+		type Pin,
+		type OverlayFrame
+	} from '@dan-slater/map-kit';
 	import type { Map as MapLibreMap } from 'maplibre-gl';
 	import SimView from '#lib/ui/SimView.svelte';
 	import SpotFacts from '#lib/ui/SpotFacts.svelte';
@@ -30,6 +44,7 @@
 
 	let mapC = $state<ReturnType<typeof Map>>();
 	let map = $state<MapLibreMap | null>(null);
+	const accent = themes.ink.tokens?.['--mk-color-accent'] ?? '#5fd1c8';
 	let selected = $state<string | null>(null);
 	let selectedPin = $state<SpotPin | null>(null);
 	let panelOpen = $state(false);
@@ -147,8 +162,13 @@
 </svelte:head>
 
 <main class="mapview">
-	<Map bind:this={mapC} bind:map center={[20, 5]} zoom={2} style="liberty" {onclick} {onmoveend}>
+	<Map bind:this={mapC} bind:map center={[20, 5]} zoom={2} style="liberty" theme={themes.ink} {onclick} {onmoveend}>
 		{#snippet children()}
+			<!-- the globe's look (Daniel picked ink); idle rotation only while no sim is open -->
+			<StarField count={110} seed={4} />
+			<GlobeGlow color={accent} />
+			<Graticule color={accent} />
+			{#if !scene}<AutoRotate degreesPerSecond={1.6} />{/if}
 			<Overlay
 				mode="webgpu"
 				onready={(f) => (overlay = f)}
