@@ -1,6 +1,69 @@
 # surf-lab — HANDOVER
 
 
+> ## 📊 NEXT: BUILD THE SHARED METRICS PACKAGE + DASHBOARD, PILOT ON SURF-LAB (2026-10-16) — READ THIS FIRST
+>
+> **Goal:** one installable package (working name `@dan-slater/site-metrics`, git-tag distributed like
+> site-editable / site-review / map-kit) that bundles every metric and tracker behind per-project switches,
+> plus ONE reusable dashboard customised per project. Daniel approved the build 2026-10-16; nothing is built
+> yet (no repo exists). surf-lab is the first consumer.
+>
+> **⚠️ UNCOMMITTED in surf-lab:** this HANDOVER block + `scripts/load-probe.mjs` (do NOT lose; commit when convenient). Both repos on `main`, in sync with GitHub (surf-lab 6f0aa6c, map-kit
+> cc8ebcf = v0.1.1). `~/dan-hub/biz` has peer sessions' uncommitted edits (not ours): stage named paths only.
+>
+> **Why it started — surf-lab load diagnosis (measured, nothing fixed yet):**
+> - Cloudflare RUM (zone auto-installed beacon) for Daniel's ZA visit 2026-10-16: first paint 2.4 s, load 2.6 s.
+>   Headless Mac Chrome: FCP 0.9 s, seabed built 2.1 s. The page is not the slow part.
+> - The perceived wait is the sim: the swell ramps from flat over `spinUpSeconds` 20 (`sim-engine.ts`
+>   `rampFrom(0)`). A warm start (pre-step model time, as `/sim/cover?warm=400` does) would remove most of it.
+> - `/map`: Open-Meteo marine call 1.5 s, OpenFreeMap glyph PBFs for many scripts, a 0.67 s long task at
+>   MapLibre start; map chunk 285 KB compressed. Google Fonts CSS ~0.5 s render-blocking (self-host it).
+> - RUM only counts full page loads; SPA navigations (cover → globe) are invisible. That is a gap the
+>   package's own web-vitals + route timing must close.
+> - Probe script: `scripts/load-probe.mjs` (UNCOMMITTED, playwright-core + system Chrome:
+>   nav timing, long tasks, resources, "Shaping the seabed" marks). RUM GraphQL: `rumPerformanceEventsAdaptiveGroups`
+>   / `rumWebVitalsEventsAdaptiveGroups` filtered by `requestHost` on account 084af6c1… (quantiles are µs;
+>   `responseStartP50` is not a field).
+>
+> **What already exists to build on (survey 2026-10-16, spot-checked):**
+> - Hand-rolled per-site loaders, all host-gated: leachie `src/lib/analytics.ts` (GA4 live; Meta pixel +
+>   Clarity IDs empty), african-surfaris `analytics.ts` + `attribution.ts` (`as:event` bus, first-touch UTMs),
+>   aerias `app/src/lib/tracking.ts` (env IDs, Meta CAPI server-side). Copy the best of each into the package.
+> - Error/CTA beacon: only nadia (`src/app.html` → `functions/api/signal.js` → ds-portal `site_signals`,
+>   `kind in ('error','cta')`, hard-coded SITE_ID). Per-site switches already exist: ds-portal `sites.features`
+>   + `site_has_feature()` (0011). Aggregate pattern to copy: `smartqr_scan_daily` (0015, daily HMAC uniques).
+> - Pull tools: `leachie-skills/seo-baseline/tools/` (`cf-web-analytics.mjs`, `gsc.mjs`, `ga4.mjs` via SA
+>   `seo-agent@leachie`, `lighthouse.sh`); `african-surfaris-preview/tools/ga4-setup.mjs` (GA4 Admin API) and
+>   `analytics-gate-check.mjs` (Playwright gate test, reuse as the package's test harness).
+> - Dashboard home: portal.leachie.com (`~/dan-hub/portal-leachie`, RLS by site membership). Grafana on the hub
+>   is Bottimus-only; the old dashboard-site was deleted for leaking client data (anything with client names or
+>   money stays behind auth). Visit pings: hub `/api/site-visit` (african-surfaris live, aerias built 2026-10-16
+>   per biz c389880). `site-watch.ts` uptime list is hard-coded to 4 sites.
+> - Nothing anywhere collects Core Web Vitals (no `web-vitals`, no PerformanceObserver) or JS errors beyond nadia.
+>
+> **Decisions (Daniel 2026-10-16):** build it. Do NOT raise privacy notices / consent banners: deferred on
+> purpose. Fix the Clarity sharing: nadia and vicky-review share project `y3vbf03ggi`; new Clarity projects
+> can only be made in the Clarity dashboard (a Daniel step), then swap nadia's ID.
+>
+> **Proposed shape (not yet agreed in detail):** (1) client package: one config `{ cfAnalytics, ga4, clarity,
+> metaPixel, vitals, errors, events }`, host-gated, `track()`; (2) one collector endpoint (CF Function/Worker)
+> → ds-portal Supabase, `site_signals` widened (vitals, route timings), bot filter, `site_has_feature` check;
+> (3) a per-site page in portal.leachie.com combining CF RUM, own vitals/errors, GSC, GA4; the same view
+> feeds the monthly client report.
+>
+> **Next actions:** 1 Daniel creates a new Clarity project for nadia (and one for surf-lab if wanted);
+> 2 create the package repo + agree the config shape; 3 collector + migration; 4 wire into surf-lab, prove
+> route timings + vitals land; 5 dashboard page; 6 then roll to nadia (replace its inline beacon), leachie,
+> african-surfaris, aerias.
+>
+> **Gotchas:** zulzi headless WebGPU broken since ~2026-10-09 (see block below); zulzi tmux `surflab-dev` and
+> `mapkit-dev` are gone too (only peer `ORCH-fv-bench` remains). wrangler 4.149 `pages project create`
+> rewrites the repo (memory `wrangler-pages-create-autoconfig-trap`). Deploys need manual permission mode.
+>
+> **Pointers:** surfism.org held (biz `accounts/DOMAINS.md`); memories `surf-lab-project`,
+> `no-privacy-notice-reminders`, `billing-observability`, `google-seo-service-account`,
+> `clarity-account-ownership`, `site-editable-versioning-gate`; biz `TRACKING-ROADMAP.md` (stale table).
+
 > ## 🌍 CONTROL-PLANE HANDOVER (2026-10-12) — map-kit v0.1.1 LIVE on the globe; all factory lines retired — READ THIS FIRST
 >
 > **State:** surf-lab `main` bd7f24c is live at https://surf.danielslater.dev (deployment 0118ad4c, noindexed,
